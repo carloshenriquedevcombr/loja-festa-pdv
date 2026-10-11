@@ -24,16 +24,21 @@ HASH = "$argon2id$v=19$teste"
 def rodar(args, **kw):
     return subprocess.run(args, capture_output=True, text=True, **kw)
 
+def sair(msg):
+    if os.environ.get("GITHUB_ACTIONS"):                         # aparece no resumo do CI
+        print("::error title=Preparação do banco::" + str(msg)[-600:].replace("\n", " "))
+    sys.exit(msg)
+
 def preparar_banco():
     for sql in (f'DROP DATABASE IF EXISTS "{TEST_DB}" WITH (FORCE)', f'CREATE DATABASE "{TEST_DB}"'):
         r = rodar(["psql", "-X", "-q", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-c", sql])
         if r.returncode:
-            sys.exit(r.stderr)
+            sair(r.stderr)
     env = {**os.environ, "PGDATABASE": TEST_DB, "MIGRATIONS_DIR": str(RAIZ / "migrations")}
     r = rodar(["bash", str(RAIZ / "scripts" / "migrate.sh")], env=env)
     print(r.stdout.strip())
     if r.returncode:
-        sys.exit("Migração falhou:\n" + r.stderr)
+        sair("Migração falhou:\n" + r.stderr)
 
 def psql(sql, superuser=False):
     pre = "" if superuser else f"SET ROLE app_user; SET app.loja_id = '{L}';\n"
@@ -44,6 +49,8 @@ def checar(nome, passou, detalhe=""):
     global ok, falhas
     ok += bool(passou); falhas += not passou
     print(("PASSOU " if passou else "FALHOU ") + nome + ("" if passou else f"\n   -> {detalhe[-400:]}"))
+    if not passou and os.environ.get("GITHUB_ACTIONS"):          # aparece no resumo do CI
+        print(f"::error title=Teste do banco::{nome}: {detalhe[-300:]}".replace("\n", " "))
 
 preparar_banco()
 ok = falhas = 0
