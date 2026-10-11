@@ -38,7 +38,8 @@ def _chamar(metodo: str, caminho: str, token: str, corpo: dict | None = None, id
     pedido = urllib.request.Request(config.MP_API + caminho, method=metodo, headers=cabecalhos,
                                     data=json.dumps(corpo).encode() if corpo is not None else None)
     try:
-        with urllib.request.urlopen(pedido, timeout=20) as r:
+        # API do Mercado Pago (https do config).
+        with urllib.request.urlopen(pedido, timeout=20) as r:  # nosec B310
             return json.loads(r.read().decode() or "{}")
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
