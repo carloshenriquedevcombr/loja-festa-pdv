@@ -13,4 +13,4 @@ fpdf2==2.8.8
 cryptography==50.0.2
 segno==1.6.6
 # Só no Windows (rodar sem Docker): o Windows não traz a tabela de fusos; sem ela "America/Sao_Paulo" não abre
-tzdata==2025.2; sys_platform == "win32"
+tzdata==2026.5; sys_platform == "win32"
