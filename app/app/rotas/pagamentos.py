@@ -4,13 +4,14 @@ import logging
 from urllib.parse import quote
 from uuid import UUID
 
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from .. import db, pagamento_online as po
 from ..auth import auditar, requer
 from ..pagamento import formulario
-from ..web import TZ, brl, checar_csrf, ler_json, ler_reais, tela
+from ..web import TZ_SQL, brl, checar_csrf, ler_json, ler_reais, tela
 
 router = APIRouter()
 log = logging.getLogger("loja")
@@ -26,14 +27,14 @@ def texto_whatsapp(loja: str, cliente: str, valor: int, url_curta: str, sku: str
 
 
 def links_do_pedido(cur, pedido_id: str, base_url: str) -> list[dict]:
-    cur.execute(f"""SELECT l.id::text, l.valor_centavos, l.status, l.forma_paga, l.observacao, l.url_externa,
+    cur.execute(sql.SQL("""SELECT l.id::text, l.valor_centavos, l.status, l.forma_paga, l.observacao, l.url_externa,
                            l.provedor, l.pix_copia_cola,
-                           to_char(l.criado_em AT TIME ZONE '{TZ}', 'DD/MM HH24:MI') AS criado,
-                           to_char(l.expira_em AT TIME ZONE '{TZ}', 'DD/MM HH24:MI') AS expira,
-                           to_char(l.pago_em AT TIME ZONE '{TZ}', 'DD/MM HH24:MI') AS pago,
+                           to_char(l.criado_em AT TIME ZONE {tz}, 'DD/MM HH24:MI') AS criado,
+                           to_char(l.expira_em AT TIME ZONE {tz}, 'DD/MM HH24:MI') AS expira,
+                           to_char(l.pago_em AT TIME ZONE {tz}, 'DD/MM HH24:MI') AS pago,
                            l.expira_em < now() AS vencido, u.nome AS quem
                       FROM links_pagamento l JOIN usuarios u ON u.id = l.criado_por
-                     WHERE l.pedido_id = %s ORDER BY l.criado_em DESC""", (pedido_id,))
+                     WHERE l.pedido_id = %s ORDER BY l.criado_em DESC""").format(tz=TZ_SQL), (pedido_id,))
     links = cur.fetchall()
     for l in links:
         l["curto"] = f"{base_url}/pagar/{l['id']}"

@@ -4,13 +4,14 @@ from urllib.parse import quote
 from uuid import UUID
 
 import psycopg
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from .. import db
 from ..auth import auditar, requer
 from ..pagamento import formulario
-from ..web import TZ, checar_csrf, mensagem_do_banco, tela
+from ..web import TZ_SQL, checar_csrf, mensagem_do_banco, tela
 from .pedidos import COMPROMISSOS as COMPROMISSOS_PEDIDO
 
 router = APIRouter()
@@ -18,17 +19,17 @@ COMPROMISSOS = {**COMPROMISSOS_PEDIDO, "VISITA": "Prova (veio pelo site)"}
 ABERTOS = "('AGENDADO','REMARCADO','FALTOU')"
 DIAS_SEMANA = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
 
-SQL_ITENS = f"""
+SQL_ITENS = sql.SQL("""
     SELECT a.id, a.tipo, a.status, a.observacao, a.pedido_id::text AS pedido_id,
-           (a.inicio AT TIME ZONE '{TZ}')::date AS dia,
-           to_char(a.inicio AT TIME ZONE '{TZ}', 'HH24:MI') AS hora,
+           (a.inicio AT TIME ZONE {tz})::date AS dia,
+           to_char(a.inicio AT TIME ZONE {tz}, 'HH24:MI') AS hora,
            cl.id::text AS cliente_id, cl.nome AS cliente, cl.telefone_c, pr.sku, pr.nome AS peca, l.nome AS loja
       FROM agendamentos a
       JOIN pedidos pe ON pe.id = a.pedido_id
       JOIN produtos pr ON pr.id = pe.produto_id
       JOIN lojas l ON l.id = a.loja_id
       LEFT JOIN clientes cl ON cl.id = pe.cliente_id
-"""
+""").format(tz=TZ_SQL)
 
 
 def whatsapp(item) -> str | None:
@@ -44,33 +45,33 @@ def whatsapp(item) -> str | None:
 @router.get("/agenda")
 def agenda(request: Request, dia: str = "", usuario: dict = Depends(requer("agenda.ver"))):
     with db.transacao(usuario_id=usuario["id"]) as cur:
-        cur.execute(f"SELECT (now() AT TIME ZONE '{TZ}')::date AS hoje")
+        cur.execute(sql.SQL("SELECT (now() AT TIME ZONE {tz})::date AS hoje").format(tz=TZ_SQL))
         hoje = cur.fetchone()["hoje"]
         try:
             inicio = date.fromisoformat(dia) if dia else hoje
         except ValueError:
             inicio = hoje
         fim = inicio + timedelta(days=7)
-        cur.execute(SQL_ITENS + f"""
-             WHERE (a.inicio AT TIME ZONE '{TZ}')::date >= %s AND (a.inicio AT TIME ZONE '{TZ}')::date < %s
+        cur.execute(SQL_ITENS + sql.SQL("""
+             WHERE (a.inicio AT TIME ZONE {tz})::date >= %s AND (a.inicio AT TIME ZONE {tz})::date < %s
                AND a.status <> 'CANCELADO'
-             ORDER BY a.inicio""", (inicio, fim))
+             ORDER BY a.inicio""").format(tz=TZ_SQL), (inicio, fim))
         itens = cur.fetchall()
-        cur.execute(SQL_ITENS + f"""
-             WHERE a.inicio < date_trunc('day', now() AT TIME ZONE '{TZ}') AT TIME ZONE '{TZ}'
-               AND a.status IN {ABERTOS}
+        cur.execute(SQL_ITENS + sql.SQL("""
+             WHERE a.inicio < date_trunc('day', now() AT TIME ZONE {tz}) AT TIME ZONE {tz}
+               AND a.status IN {abertos}
                AND pe.status NOT IN ('CANCELADO','CONCLUIDO','RETIRADO','VENDIDO')
-             ORDER BY a.inicio""")
+             ORDER BY a.inicio""").format(tz=TZ_SQL, abertos=sql.SQL(ABERTOS)))
         atrasados = cur.fetchall()
         # Provas marcadas a partir dos pedidos do site (ainda sem pedido na loja)
-        cur.execute(f"""
+        cur.execute(sql.SQL("""
             SELECT s.id::text AS solicitacao, 'VISITA' AS tipo, 'AGENDADO' AS status, s.mensagem_c AS observacao_c,
-                   NULL AS pedido_id, (s.agendada_para AT TIME ZONE '{TZ}')::date AS dia,
-                   to_char(s.agendada_para AT TIME ZONE '{TZ}', 'HH24:MI') AS hora, s.cliente_id::text AS cliente_id,
+                   NULL AS pedido_id, (s.agendada_para AT TIME ZONE {tz})::date AS dia,
+                   to_char(s.agendada_para AT TIME ZONE {tz}, 'HH24:MI') AS hora, s.cliente_id::text AS cliente_id,
                    s.nome AS cliente, s.telefone_c AS telefone_sol_c, pr.sku, pr.nome AS peca, l.nome AS loja
               FROM solicitacoes_prova s LEFT JOIN produtos pr ON pr.id = s.produto_id JOIN lojas l ON l.id = s.loja_id
-             WHERE s.status = 'AGENDADA' AND (s.agendada_para AT TIME ZONE '{TZ}')::date >= %s
-               AND (s.agendada_para AT TIME ZONE '{TZ}')::date < %s""", (inicio, fim))
+             WHERE s.status = 'AGENDADA' AND (s.agendada_para AT TIME ZONE {tz})::date >= %s
+               AND (s.agendada_para AT TIME ZONE {tz})::date < %s""").format(tz=TZ_SQL), (inicio, fim))
         itens = sorted(itens + cur.fetchall(), key=lambda i: (i["dia"], i["hora"]))
     from .. import cripto
     for it in itens + atrasados:
@@ -90,7 +91,7 @@ def agenda(request: Request, dia: str = "", usuario: dict = Depends(requer("agen
 
 def _item(cur, aid):
     from .. import cripto
-    cur.execute(SQL_ITENS + " WHERE a.id = %s", (aid,))
+    cur.execute(SQL_ITENS + sql.SQL(" WHERE a.id = %s"), (aid,))
     return cripto.abrir(cur.fetchone(), "clientes", "telefone")
 
 
@@ -121,7 +122,7 @@ def remarcar(request: Request, aid: UUID, usuario: dict = Depends(requer("agenda
                 return RedirectResponse("/agenda", status_code=303)
             cur.execute("SELECT * FROM pedidos WHERE id = %s", (it["pedido_id"],))
             pe = cur.fetchone()
-            cur.execute(f"SELECT (now() AT TIME ZONE '{TZ}')::date AS hoje")
+            cur.execute(sql.SQL("SELECT (now() AT TIME ZONE {tz})::date AS hoje").format(tz=TZ_SQL))
             hoje = cur.fetchone()["hoje"]
             if not erro and it["status"] in ("FEITO", "CANCELADO"):
                 erro = "Este compromisso já foi feito ou cancelado."
@@ -148,15 +149,15 @@ def remarcar(request: Request, aid: UUID, usuario: dict = Depends(requer("agenda
                 elif it["tipo"] == "DEVOLUCAO":
                     cur.execute("UPDATE pedidos SET data_devolucao = %s WHERE id = %s", (novo_dia, it["pedido_id"]))
                 # A reserva da peça acompanha a agenda (o banco recusa se bater com outro pedido)
-                cur.execute(f"""
+                cur.execute(sql.SQL("""
                     UPDATE pedidos p
                        SET inicio_bloqueio = x.primeiro,
                            periodo_bloqueado = daterange(x.primeiro,
                                CASE WHEN p.tipo = 'ALUGUEL' THEN p.data_devolucao + c.dias_limpeza ELSE p.data_retirada END, '[]')
                       FROM config_pagamento c,
-                           (SELECT min((inicio AT TIME ZONE '{TZ}')::date) AS primeiro FROM agendamentos
+                           (SELECT min((inicio AT TIME ZONE {tz})::date) AS primeiro FROM agendamentos
                              WHERE pedido_id = %s AND status <> 'CANCELADO') x
-                     WHERE c.id = p.config_id AND p.id = %s AND p.periodo_bloqueado IS NOT NULL""",
+                     WHERE c.id = p.config_id AND p.id = %s AND p.periodo_bloqueado IS NOT NULL""").format(tz=TZ_SQL),
                             (it["pedido_id"], it["pedido_id"]))
                 from .. import eventos
                 eventos.remarcado(cur, str(it["pedido_id"]), COMPROMISSOS[it["tipo"]].lower(),

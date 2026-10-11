@@ -35,7 +35,8 @@ def _chamar(cfg: dict, metodo: str, caminho: str, corpo: dict | None = None, tok
     pedido = urllib.request.Request(url, method=metodo, headers=cab,
                                     data=json.dumps(corpo).encode() if corpo is not None else None)
     try:
-        with urllib.request.urlopen(pedido, timeout=tempo) as r:
+        # URL validada como http(s) ao salvar a config.
+        with urllib.request.urlopen(pedido, timeout=tempo) as r:  # nosec B310
             texto = r.read().decode() or "{}"
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):

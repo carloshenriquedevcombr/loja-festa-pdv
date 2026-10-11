@@ -1,5 +1,6 @@
 """Código de barras Code128 (conjunto B) em SVG, sem dependências.
 Lido por qualquer leitor de código de barras USB comum (ele "digita" o SKU)."""
+import html
 
 # Larguras barra/espaço de cada símbolo 0..105, e o STOP (106).
 PADROES = [
@@ -44,7 +45,7 @@ def svg(texto: str, modulo: float = 2.0, altura: float = 70.0, margem: int = 10)
         x += w * modulo
     largura = x + margem * modulo
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {largura:.1f} {altura:.0f}" '
-            f'width="{largura:.0f}" height="{altura:.0f}" role="img" aria-label="Código de barras {texto}">'
+            f'width="{largura:.0f}" height="{altura:.0f}" role="img" aria-label="Código de barras {html.escape(texto)}">'
             f'<rect width="100%" height="100%" fill="#fff"/><g fill="#000">{"".join(barras)}</g></svg>')
 
 

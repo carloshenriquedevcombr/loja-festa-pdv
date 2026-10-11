@@ -6,13 +6,14 @@ from datetime import date, time, timedelta
 from uuid import UUID
 
 import psycopg
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from .. import crediario, cripto, db, eventos, pagamento, pagamento_online, pessoas
 from ..auth import auditar, pode, requer
 from ..pagamento import formulario
-from ..web import (TZ, brl, chave_valida, checar_csrf, e_chave_repetida, ler_reais, mensagem_do_banco,
+from ..web import (TZ, TZ_SQL, brl, chave_valida, checar_csrf, e_chave_repetida, ler_reais, mensagem_do_banco,
                    nova_chave, tela, telefone, volta_segura)
 
 router = APIRouter()
@@ -229,9 +230,9 @@ def novo_form(request: Request, peca: UUID | None = None, cliente: UUID | None =
         if busca_cliente.strip():
             from .caixa import filtro_cliente
             filtro, params = filtro_cliente(busca_cliente.strip()[:60])
-            cur.execute(f"""SELECT cl.id::text AS id, cl.nome, cl.telefone_fim,
+            cur.execute(sql.SQL("""SELECT cl.id::text AS id, cl.nome, cl.telefone_fim,
                                    (SELECT count(*) FROM pedidos x WHERE x.cliente_id = cl.id) AS pedidos
-                              FROM clientes cl WHERE {filtro} ORDER BY cl.nome LIMIT 15""", params)
+                              FROM clientes cl WHERE {filtro} ORDER BY cl.nome LIMIT 15""").format(filtro=sql.SQL(filtro)), params)
             achadas = cur.fetchall()
         return _form_novo(request, usuario, cur, p, v=v, achadas=achadas, busca_cliente=busca_cliente[:60])
 
@@ -379,18 +380,19 @@ def lista(request: Request, filtro: str = "ativos", q: str = "", usuario: dict =
     if q.strip():
         condicoes.append("(f_unaccent(lower(coalesce(cl.nome,''))) LIKE f_unaccent(lower(%(q)s)) OR pr.sku ILIKE %(q)s)")
     with db.transacao(usuario_id=usuario["id"]) as cur:
-        cur.execute(f"""
+        cur.execute(sql.SQL("""
             SELECT pe.id::text, pe.tipo, pe.com_ajuste, pe.status, pe.data_retirada, pe.data_devolucao,
                    pe.valor_total_centavos, pr.sku, pr.nome AS peca, cl.nome AS cliente,
                    pe.valor_total_centavos - valor_pago(pe.id) AS saldo,
-                   (pe.status = 'ALUGADO' AND pe.data_devolucao < (now() AT TIME ZONE '{TZ}')::date) AS atrasado,
+                   (pe.status = 'ALUGADO' AND pe.data_devolucao < (now() AT TIME ZONE {tz})::date) AS atrasado,
                    (SELECT cs.entrega FROM compras_itens ci JOIN compras_site cs ON cs.id = ci.compra_id
                      WHERE ci.pedido_id = pe.id LIMIT 1) AS do_site
               FROM pedidos pe JOIN produtos pr ON pr.id = pe.produto_id
               LEFT JOIN clientes cl ON cl.id = pe.cliente_id
-             {'WHERE ' + ' AND '.join(condicoes) if condicoes else ''}
-             ORDER BY COALESCE(pe.data_retirada, pe.criado_em::date) {'DESC' if filtro == 'todos' else 'ASC'}
-             LIMIT 200""", params)
+             {onde}
+             ORDER BY COALESCE(pe.data_retirada, pe.criado_em::date) {sentido}
+             LIMIT 200""").format(tz=TZ_SQL, onde=sql.SQL("WHERE " + " AND ".join(condicoes) if condicoes else ""),
+                                  sentido=sql.SQL("DESC" if filtro == "todos" else "ASC")), params)
         pedidos = cur.fetchall()
     return tela(request, "pedidos_lista.html", usuario, pedidos=pedidos, filtro=filtro, q=q, STATUS=STATUS)
 
@@ -410,32 +412,32 @@ def _tela_detalhe(request, usuario, pid, erro=None, status=200, novo=0):
         pe = _pedido(cur, pid)
         if not pe:
             return tela(request, "erro.html", usuario, status=404, titulo="Pedido não encontrado")
-        cur.execute(f"""SELECT t.id, t.tipo, t.natureza, t.valor_centavos, t.forma_pagamento, t.parcelas,
-                               to_char(t.criado_em AT TIME ZONE '{TZ}', 'DD/MM HH24:MI') AS quando, u.nome AS quem
+        cur.execute(sql.SQL("""SELECT t.id, t.tipo, t.natureza, t.valor_centavos, t.forma_pagamento, t.parcelas,
+                               to_char(t.criado_em AT TIME ZONE {tz}, 'DD/MM HH24:MI') AS quando, u.nome AS quem
                           FROM transacoes t JOIN usuarios u ON u.id = t.usuario_id
-                         WHERE t.pedido_id = %s ORDER BY t.id""", (pid,))
+                         WHERE t.pedido_id = %s ORDER BY t.id""").format(tz=TZ_SQL), (pid,))
         pagamentos = cur.fetchall()
-        cur.execute(f"""SELECT h.para, to_char(h.criado_em AT TIME ZONE '{TZ}', 'DD/MM HH24:MI') AS quando,
+        cur.execute(sql.SQL("""SELECT h.para, to_char(h.criado_em AT TIME ZONE {tz}, 'DD/MM HH24:MI') AS quando,
                                u.nome AS quem
                           FROM historico_status h LEFT JOIN usuarios u ON u.id = h.usuario_id
-                         WHERE h.pedido_id = %s ORDER BY h.id""", (pid,))
+                         WHERE h.pedido_id = %s ORDER BY h.id""").format(tz=TZ_SQL), (pid,))
         historico = cur.fetchall()
         etapas = [] if pe["status"] in FINAIS else etapas_possiveis(cur, usuario, pe)
-        cur.execute(f"""SELECT a.id, a.tipo, a.status, a.observacao,
-                               (a.inicio AT TIME ZONE '{TZ}')::date AS dia,
-                               to_char(a.inicio AT TIME ZONE '{TZ}', 'HH24:MI') AS hora,
+        cur.execute(sql.SQL("""SELECT a.id, a.tipo, a.status, a.observacao,
+                               (a.inicio AT TIME ZONE {tz})::date AS dia,
+                               to_char(a.inicio AT TIME ZONE {tz}, 'HH24:MI') AS hora,
                                (a.inicio < now() AND a.status IN ('AGENDADO','REMARCADO')) AS atrasado
                           FROM agendamentos a WHERE a.pedido_id = %s
-                         ORDER BY a.inicio""", (pid,))
+                         ORDER BY a.inicio""").format(tz=TZ_SQL), (pid,))
         agenda = cur.fetchall()
         cur.execute("SELECT nome FROM lojas WHERE id = ctx_loja()")
         loja = cur.fetchone()["nome"]
-        cur.execute(f"""SELECT to_char(pe.criado_em AT TIME ZONE '{TZ}', 'DD/MM/YYYY') AS contratado,
+        cur.execute(sql.SQL("""SELECT to_char(pe.criado_em AT TIME ZONE {tz}, 'DD/MM/YYYY') AS contratado,
                                pe.data_devolucao + c.dias_limpeza AS limpeza_ate
-                          FROM pedidos pe JOIN config_pagamento c ON c.id = pe.config_id WHERE pe.id = %s""", (pid,))
+                          FROM pedidos pe JOIN config_pagamento c ON c.id = pe.config_id WHERE pe.id = %s""").format(tz=TZ_SQL), (pid,))
         marcos = cur.fetchone()
-        cur.execute(f"""SELECT codigo, to_char(assinado_em AT TIME ZONE '{TZ}', 'DD/MM/YYYY HH24:MI') AS quando
-                          FROM contratos WHERE pedido_id = %s""", (pid,))
+        cur.execute(sql.SQL("""SELECT codigo, to_char(assinado_em AT TIME ZONE {tz}, 'DD/MM/YYYY HH24:MI') AS quando
+                          FROM contratos WHERE pedido_id = %s""").format(tz=TZ_SQL), (pid,))
         contrato_assinado = cur.fetchone()
         cur.execute("""SELECT c.id::text AS id, c.valor_centavos, c.parcelas, c.status,
                               (SELECT count(*) FROM crediario_parcelas p WHERE p.crediario_id = c.id AND p.paga_em IS NOT NULL) AS pagas

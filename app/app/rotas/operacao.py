@@ -1,11 +1,12 @@
 """Filas de trabalho (costura, limpeza), relatório do mês e painel técnico."""
 from datetime import date
 
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 
 from .. import config, db
 from ..auth import requer
-from ..web import TZ, tela
+from ..web import TZ_SQL, tela
 from .pedidos import STATUS, etapas_possiveis
 
 router = APIRouter()
@@ -16,14 +17,14 @@ def _fila(request, usuario, titulo, grupos, vazio):
     blocos = []
     with db.transacao(usuario_id=usuario["id"]) as cur:
         for nome, status in grupos:
-            cur.execute(f"""
+            cur.execute(sql.SQL("""
                 SELECT pe.id::text, pe.status, pe.fluxo, pe.tipo, pe.data_retirada, pe.data_devolucao,
                        pr.sku, pr.nome AS peca, cl.nome AS cliente, cl.id::text AS cliente_id,
-                       (pe.data_retirada - (now() AT TIME ZONE '{TZ}')::date) AS dias
+                       (pe.data_retirada - (now() AT TIME ZONE {tz})::date) AS dias
                   FROM pedidos pe JOIN produtos pr ON pr.id = pe.produto_id
                   LEFT JOIN clientes cl ON cl.id = pe.cliente_id
                  WHERE pe.status = ANY(%s)
-                 ORDER BY pe.data_retirada NULLS LAST, pe.criado_em""", (list(status),))
+                 ORDER BY pe.data_retirada NULLS LAST, pe.criado_em""").format(tz=TZ_SQL), (list(status),))
             itens = cur.fetchall()
             for item in itens:
                 item["etapas"] = etapas_possiveis(cur, usuario, item)
@@ -54,21 +55,21 @@ def relatorios(request: Request, mes: str = "", usuario: dict = Depends(requer("
         inicio = None
     with db.transacao(usuario_id=usuario["id"]) as cur:
         if not inicio:
-            cur.execute(f"SELECT date_trunc('month', now() AT TIME ZONE '{TZ}')::date AS m")
+            cur.execute(sql.SQL("SELECT date_trunc('month', now() AT TIME ZONE {tz})::date AS m").format(tz=TZ_SQL))
             inicio = cur.fetchone()["m"]
         fim = date(inicio.year + (inicio.month == 12), inicio.month % 12 + 1, 1)
-        dia = f"(t.criado_em AT TIME ZONE '{TZ}')::date"
-        cur.execute(f"""
+        dia = sql.SQL("(t.criado_em AT TIME ZONE {tz})::date").format(tz=TZ_SQL)
+        cur.execute(sql.SQL("""
             SELECT {dia} AS dia,
                    sum(valor_centavos) FILTER (WHERE tipo = 'ENTRADA') AS entrou,
                    sum(valor_centavos) FILTER (WHERE tipo = 'SAIDA')   AS saiu
-              FROM transacoes t WHERE {dia} >= %s AND {dia} < %s GROUP BY 1 ORDER BY 1""", (inicio, fim))
+              FROM transacoes t WHERE {dia} >= %s AND {dia} < %s GROUP BY 1 ORDER BY 1""").format(dia=dia), (inicio, fim))
         dias = cur.fetchall()
-        cur.execute(f"""
+        cur.execute(sql.SQL("""
             SELECT forma_pagamento AS forma,
                    sum(CASE WHEN tipo = 'ENTRADA' THEN valor_centavos ELSE -valor_centavos END) AS liquido,
                    sum(acrescimo_juros_centavos) AS juros
-              FROM transacoes t WHERE {dia} >= %s AND {dia} < %s GROUP BY 1 ORDER BY 2 DESC""", (inicio, fim))
+              FROM transacoes t WHERE {dia} >= %s AND {dia} < %s GROUP BY 1 ORDER BY 2 DESC""").format(dia=dia), (inicio, fim))
         formas = cur.fetchall()
         cur.execute("""
             SELECT count(*) FILTER (WHERE tipo = 'ALUGUEL')                  AS alugueis,
@@ -78,7 +79,7 @@ def relatorios(request: Request, mes: str = "", usuario: dict = Depends(requer("
                AND (criado_em AT TIME ZONE 'America/Sao_Paulo')::date >= %s
                AND (criado_em AT TIME ZONE 'America/Sao_Paulo')::date < %s""", (inicio, fim))
         pedidos = cur.fetchone()
-        cur.execute(f"""SELECT COALESCE(sum(valor_total_centavos - valor_pago(id)), 0) AS a_receber
+        cur.execute("""SELECT COALESCE(sum(valor_total_centavos - valor_pago(id)), 0) AS a_receber
                           FROM pedidos WHERE status NOT IN ('CANCELADO','CONCLUIDO','RETIRADO','VENDIDO')""")
         a_receber = cur.fetchone()["a_receber"]
     total_entrou = sum(d["entrou"] or 0 for d in dias)
@@ -100,10 +101,10 @@ def sistema(request: Request, usuario: dict = Depends(requer("sistema.ver_tudo")
                               pg_size_pretty(pg_database_size(current_database())) AS tamanho,
                               version() AS versao""")
         numeros = cur.fetchone()
-        cur.execute(f"""SELECT to_char(a.criado_em AT TIME ZONE '{TZ}', 'DD/MM HH24:MI:SS') AS quando, a.acao,
+        cur.execute(sql.SQL("""SELECT to_char(a.criado_em AT TIME ZONE {tz}, 'DD/MM HH24:MI:SS') AS quando, a.acao,
                                a.entidade, u.nome AS quem, host(a.ip) AS ip
                           FROM auditoria a LEFT JOIN usuarios u ON u.id = a.usuario_id
-                         ORDER BY a.id DESC LIMIT 40""")
+                         ORDER BY a.id DESC LIMIT 40""").format(tz=TZ_SQL))
         eventos = cur.fetchall()
     return tela(request, "sistema.html", usuario, numeros=numeros, eventos=eventos,
                 cookie_seguro=config.COOKIE_SECURE)

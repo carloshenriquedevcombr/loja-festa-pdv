@@ -3,6 +3,7 @@ import re
 from uuid import UUID
 
 import psycopg
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, RedirectResponse, Response
@@ -44,14 +45,15 @@ def buscar(cur, q: str = "", filtro: str = "todas", limite: int = 60) -> list[di
         condicoes.append(f"(ps.sku = %(sku)s OR ({' AND '.join(palavras)}) "
                          f"OR f_unaccent(lower(ps.nome)) %% f_unaccent(lower(%(q)s)))")
         ordem = "(ps.sku = %(sku)s) DESC, similarity(f_unaccent(lower(ps.nome)), f_unaccent(lower(%(q)s))) DESC, ps.sku"
-    cur.execute(f"""
+    cur.execute(sql.SQL("""
         SELECT ps.id::text, ps.sku, ps.nome, ps.tamanho, ps.cor, ps.pode_alugar, ps.pode_vender,
                ps.preco_aluguel_centavos, ps.preco_venda_centavos, ps.situacao_hoje, c.nome AS categoria,
                (SELECT f.arquivo FROM produto_fotos f WHERE f.produto_id = ps.id AND f.ativa
                  ORDER BY f.ordem, f.criado_em LIMIT 1) AS capa
           FROM produtos_situacao ps JOIN categorias c ON c.id = ps.categoria_id
-         WHERE {' AND '.join(condicoes)}
-         ORDER BY {ordem} LIMIT {int(limite)}""", params)
+         WHERE {condicoes}
+         ORDER BY {ordem} LIMIT {limite}""").format(condicoes=sql.SQL(" AND ".join(condicoes)), ordem=sql.SQL(ordem),
+                                                     limite=sql.Literal(int(limite))), params)
     return cur.fetchall()
 
 
@@ -90,8 +92,8 @@ COMPRIMENTO = {"CURTO": "Curto", "MIDI": "Midi", "LONGO": "Longo"}
 
 def ocasioes_arvore(cur, so_ativas: bool = True) -> list[dict]:
     """[{id, nome, slug, filhos: [...]}] na ordem da loja."""
-    cur.execute("SELECT id, pai_id, nome, slug, ordem, ativa FROM ocasioes"
-                + (" WHERE ativa" if so_ativas else "") + " ORDER BY ordem, nome")
+    cur.execute(sql.SQL("SELECT id, pai_id, nome, slug, ordem, ativa FROM ocasioes{} ORDER BY ordem, nome")
+                .format(sql.SQL(" WHERE ativa" if so_ativas else "")))
     linhas = cur.fetchall()
     grupos = [dict(o, filhos=[]) for o in linhas if o["pai_id"] is None]
     por_id = {g["id"]: g for g in grupos}
@@ -227,11 +229,11 @@ def detalhe(request: Request, pid: UUID, nova: int = 0, usuario: dict = Depends(
         p = _peca(cur, pid)
         if not p:
             return tela(request, "erro.html", usuario, status=404, titulo="Peça não encontrada")
-        cur.execute(f"""
+        cur.execute(sql.SQL("""
             SELECT pe.id::text, pe.tipo, pe.status, pe.data_retirada, pe.data_devolucao, cl.nome AS cliente
               FROM pedidos pe LEFT JOIN clientes cl ON cl.id = pe.cliente_id
-             WHERE pe.produto_id = %s AND pe.status NOT IN {ATIVOS}
-             ORDER BY pe.data_retirada NULLS LAST""", (pid,))
+             WHERE pe.produto_id = %s AND pe.status NOT IN {ativos}
+             ORDER BY pe.data_retirada NULLS LAST""").format(ativos=sql.SQL(ATIVOS)), (pid,))
         reservas = cur.fetchall()
         cur.execute("SELECT id::text, arquivo, ordem FROM produto_fotos WHERE produto_id = %s AND ativa "
                     "ORDER BY ordem, criado_em", (pid,))
@@ -306,7 +308,8 @@ def arquivar(request: Request, pid: UUID, usuario: dict = Depends(requer("catalo
     if form.get("confirmar") != "1":
         return RedirectResponse(f"/pecas/{pid}", status_code=303)
     with db.transacao(usuario_id=usuario["id"]) as cur:
-        cur.execute(f"SELECT count(*) AS n FROM pedidos WHERE produto_id = %s AND status NOT IN {ATIVOS}", (pid,))
+        cur.execute(sql.SQL("SELECT count(*) AS n FROM pedidos WHERE produto_id = %s AND status NOT IN {ativos}")
+                    .format(ativos=sql.SQL(ATIVOS)), (pid,))
         if cur.fetchone()["n"]:
             p = _peca(cur, pid)
             return tela(request, "erro.html", usuario, status=400, titulo="Esta peça tem pedido em andamento",

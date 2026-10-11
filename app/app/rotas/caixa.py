@@ -3,13 +3,14 @@ import uuid
 from datetime import date
 
 import psycopg
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response
 
 from .. import codigos, cripto, db, fotos, pagamento
 from ..auth import auditar, pode, requer
 from ..pagamento import formulario, formulario_com_nota
-from ..web import TZ, chave_valida, checar_csrf, e_chave_repetida, mensagem_do_banco, nova_chave, tela
+from ..web import TZ_SQL, chave_valida, checar_csrf, e_chave_repetida, mensagem_do_banco, nova_chave, tela
 
 router = APIRouter()
 
@@ -39,25 +40,25 @@ def buscar_para_receber(cur, q: str) -> dict:
     numero, _ = codigos.separar(q)
     filtro, params = filtro_cliente(q)
     params.update({"sku": f"%{q}%", "pref": f"{numero.lower()}%" if codigos.parece_codigo_pedido(numero) else "#"})
-    cur.execute(f"""SELECT pe.id::text AS id, pr.sku, pr.nome AS peca, cl.nome AS cliente, pe.status, pe.tipo,
+    cur.execute(sql.SQL("""SELECT pe.id::text AS id, pr.sku, pr.nome AS peca, cl.nome AS cliente, pe.status, pe.tipo,
                            pe.valor_total_centavos - valor_pago(pe.id) AS saldo, pe.data_retirada
                       FROM pedidos pe JOIN produtos pr ON pr.id = pe.produto_id
                       LEFT JOIN clientes cl ON cl.id = pe.cliente_id
                      WHERE pe.status <> 'CANCELADO' AND pe.valor_total_centavos - valor_pago(pe.id) > 0
                        AND (pr.sku ILIKE %(sku)s OR replace(pe.id::text, '-', '') LIKE %(pref)s OR {filtro})
-                     ORDER BY pe.criado_em DESC LIMIT 30""", params)
+                     ORDER BY pe.criado_em DESC LIMIT 30""").format(filtro=sql.SQL(filtro)), params)
     pedidos = cur.fetchall()
-    cur.execute(f"""SELECT c.id::text AS id, cl.nome AS cliente, p.numero, c.parcelas, p.valor_centavos, p.vencimento,
-                           p.vencimento < (now() AT TIME ZONE '{TZ}')::date AS vencida
+    cur.execute(sql.SQL("""SELECT c.id::text AS id, cl.nome AS cliente, p.numero, c.parcelas, p.valor_centavos, p.vencimento,
+                           p.vencimento < (now() AT TIME ZONE {tz})::date AS vencida
                       FROM crediario_parcelas p JOIN crediarios c ON c.id = p.crediario_id
                       JOIN clientes cl ON cl.id = c.cliente_id
                      WHERE p.paga_em IS NULL AND c.status = 'ATIVO' AND {filtro}
                        AND p.numero = (SELECT min(x.numero) FROM crediario_parcelas x
                                         WHERE x.crediario_id = c.id AND x.paga_em IS NULL)
-                     ORDER BY p.vencimento LIMIT 30""", params)
+                     ORDER BY p.vencimento LIMIT 30""").format(tz=TZ_SQL, filtro=sql.SQL(filtro)), params)
     parcelas = cur.fetchall()
-    cur.execute(f"SELECT cl.id::text AS id, cl.nome, cl.telefone_fim FROM clientes cl WHERE {filtro} ORDER BY cl.nome LIMIT 15",
-                params)
+    cur.execute(sql.SQL("SELECT cl.id::text AS id, cl.nome, cl.telefone_fim FROM clientes cl WHERE {filtro} ORDER BY cl.nome LIMIT 15")
+                .format(filtro=sql.SQL(filtro)), params)
     return {"pedidos": pedidos, "parcelas": parcelas, "clientes": cur.fetchall()}
 
 
@@ -249,13 +250,13 @@ def caixa_do_dia(request: Request, dia: str | None = None,
     except ValueError:
         escolhido = None
     with db.transacao(usuario_id=usuario["id"]) as cur:
-        cur.execute(f"SELECT (now() AT TIME ZONE '{TZ}')::date AS hoje")
+        cur.execute(sql.SQL("SELECT (now() AT TIME ZONE {tz})::date AS hoje").format(tz=TZ_SQL))
         hoje = cur.fetchone()["hoje"]
         escolhido = escolhido or hoje
-        cur.execute(f"""
+        cur.execute(sql.SQL("""
             SELECT t.id, t.tipo, t.natureza, t.valor_centavos, t.acrescimo_juros_centavos, t.forma_pagamento,
                    t.parcelas, t.descricao, t.estorno_de, t.pedido_id, t.usuario_id::text AS usuario_id,
-                   to_char(t.criado_em AT TIME ZONE '{TZ}', 'HH24:MI') AS hora,
+                   to_char(t.criado_em AT TIME ZONE {tz}, 'HH24:MI') AS hora,
                    u.nome AS quem, m.apelido AS maquininha, p.sku, f.nome AS fornecedor, t.documento, t.anexo,
                    t.categoria,
                    EXISTS (SELECT 1 FROM transacoes e WHERE e.estorno_de = t.id) AS desfeito
@@ -265,8 +266,8 @@ def caixa_do_dia(request: Request, dia: str | None = None,
               LEFT JOIN fornecedores f ON f.id = t.fornecedor_id
               LEFT JOIN pedidos pe ON pe.id = t.pedido_id
               LEFT JOIN produtos p ON p.id = pe.produto_id
-             WHERE (t.criado_em AT TIME ZONE '{TZ}')::date = %s
-             ORDER BY t.id DESC""", (escolhido,))
+             WHERE (t.criado_em AT TIME ZONE {tz})::date = %s
+             ORDER BY t.id DESC""").format(tz=TZ_SQL), (escolhido,))
         lancamentos = cur.fetchall()
     tot = {"entrou": 0, "saiu": 0, "gaveta": 0, "por_forma": {}}
     for t in lancamentos:

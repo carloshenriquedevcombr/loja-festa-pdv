@@ -1,6 +1,7 @@
 """Marca da loja: enviar logo e ícone; servir logo, ícones e favicon (públicos)."""
 from urllib.parse import quote
 
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, Response
@@ -69,7 +70,7 @@ async def remover(request: Request, usuario: dict = Depends(requer("site.editar"
     checar_csrf(request, str(form.get("csrf") or ""))
     campo = "logo_arquivo" if form.get("qual") == "logo" else "icone_arquivo"
     with db.transacao(usuario_id=usuario["id"]) as cur:
-        cur.execute(f"UPDATE lojas SET {campo} = NULL WHERE id = ctx_loja()")      # campo vem da lista acima
+        cur.execute(sql.SQL("UPDATE lojas SET {} = NULL WHERE id = ctx_loja()").format(sql.Identifier(campo)))  # campo vem da lista acima
         auditar(cur, request, "marca_removida", usuario["id"], "loja", None, {"campo": campo})
     esquecer_marca()
     return RedirectResponse(f"/config/marca?ok={quote('Removido. O arquivo antigo fica guardado.')}", status_code=303)

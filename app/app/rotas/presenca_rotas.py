@@ -3,6 +3,7 @@ import hashlib
 import time
 from urllib.parse import urlparse
 
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse, Response
 
@@ -114,13 +115,14 @@ def buscar(request: Request, q: str = "", usuario: dict = Depends(requer("pedido
         filtro, params = filtro_cliente(q)
         pedidos, clientes, pecas = [], [], []
         if "pedidos.ver" in perms:
-            cur.execute(f"""SELECT pe.id::text AS id, pr.sku, pr.nome AS peca, cl.nome AS cliente, pe.status
+            cur.execute(sql.SQL("""SELECT pe.id::text AS id, pr.sku, pr.nome AS peca, cl.nome AS cliente, pe.status
                               FROM pedidos pe JOIN produtos pr ON pr.id = pe.produto_id LEFT JOIN clientes cl ON cl.id = pe.cliente_id
-                             WHERE pr.sku ILIKE %(sku)s OR {filtro} ORDER BY pe.criado_em DESC LIMIT 20""",
+                             WHERE pr.sku ILIKE %(sku)s OR {filtro} ORDER BY pe.criado_em DESC LIMIT 20""").format(filtro=sql.SQL(filtro)),
                         {**params, "sku": f"%{q}%"})
             pedidos = cur.fetchall()
         if "clientes.ver" in perms:
-            cur.execute(f"SELECT cl.id::text AS id, cl.nome FROM clientes cl WHERE {filtro} ORDER BY cl.nome LIMIT 20", params)
+            cur.execute(sql.SQL("SELECT cl.id::text AS id, cl.nome FROM clientes cl WHERE {filtro} ORDER BY cl.nome LIMIT 20")
+                        .format(filtro=sql.SQL(filtro)), params)
             clientes = cur.fetchall()
         if "catalogo.ver" in perms:
             cur.execute("""SELECT id::text, sku, nome FROM produtos

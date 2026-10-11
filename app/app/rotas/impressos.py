@@ -6,12 +6,13 @@ Formatos:
 """
 from uuid import UUID
 
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from .. import codigos, cripto, db
 from ..auth import auditar, pode, requer
-from ..web import TZ, brl, tela
+from ..web import TZ_SQL, brl, tela
 from .pedidos import STATUS, TIPO_NOME
 
 router = APIRouter()
@@ -51,22 +52,22 @@ def _fluxo(p: dict) -> str:
 def checklist(request: Request, pid: UUID, formato: str = "10x15", usuario: dict = Depends(requer("pedidos.ver"))):
     formato = formato if formato in ("10x15", "a4") else "10x15"
     with db.transacao(usuario_id=usuario["id"]) as cur:
-        cur.execute(f"""SELECT pe.id::text AS id, pe.tipo, pe.com_ajuste, pe.status, pe.data_retirada, pe.data_devolucao,
+        cur.execute(sql.SQL("""SELECT pe.id::text AS id, pe.tipo, pe.com_ajuste, pe.status, pe.data_retirada, pe.data_devolucao,
                                pe.data_festa, pe.valor_total_centavos, valor_pago(pe.id) AS pago,
                                pr.sku, pr.nome AS peca, pr.tamanho, pr.cor, cl.nome AS cliente, cl.telefone_c,
-                               to_char(pe.criado_em AT TIME ZONE '{TZ}', 'DD/MM/YYYY') AS feito, u.nome AS atendente
+                               to_char(pe.criado_em AT TIME ZONE {tz}, 'DD/MM/YYYY') AS feito, u.nome AS atendente
                           FROM pedidos pe JOIN produtos pr ON pr.id = pe.produto_id
                           JOIN usuarios u ON u.id = pe.criado_por
-                          LEFT JOIN clientes cl ON cl.id = pe.cliente_id WHERE pe.id = %s""", (str(pid),))
+                          LEFT JOIN clientes cl ON cl.id = pe.cliente_id WHERE pe.id = %s""").format(tz=TZ_SQL), (str(pid),))
         p = cur.fetchone()
         if not p:
             return tela(request, "erro.html", usuario, status=404, titulo="Pedido não encontrado")
-        cur.execute(f"""SELECT h.para, to_char(h.criado_em AT TIME ZONE '{TZ}', 'DD/MM') AS quando, u.nome AS quem
+        cur.execute(sql.SQL("""SELECT h.para, to_char(h.criado_em AT TIME ZONE {tz}, 'DD/MM') AS quando, u.nome AS quem
                           FROM historico_status h LEFT JOIN usuarios u ON u.id = h.usuario_id
-                         WHERE h.pedido_id = %s ORDER BY h.id""", (str(pid),))
+                         WHERE h.pedido_id = %s ORDER BY h.id""").format(tz=TZ_SQL), (str(pid),))
         feitos = {h["para"]: h for h in cur.fetchall()}
-        cur.execute(f"""SELECT tipo, to_char(inicio AT TIME ZONE '{TZ}', 'DD/MM HH24:MI') AS quando FROM agendamentos
-                         WHERE pedido_id = %s AND status <> 'CANCELADO' ORDER BY inicio""", (str(pid),))
+        cur.execute(sql.SQL("""SELECT tipo, to_char(inicio AT TIME ZONE {tz}, 'DD/MM HH24:MI') AS quando FROM agendamentos
+                         WHERE pedido_id = %s AND status <> 'CANCELADO' ORDER BY inicio""").format(tz=TZ_SQL), (str(pid),))
         agenda = {a["tipo"]: a["quando"] for a in cur.fetchall()}
         auditar(cur, request, "checklist_impresso", usuario["id"], "pedido", str(pid))
     fone = cripto.decifrar(p.pop("telefone_c"), "clientes.telefone") if p.get("telefone_c") else None

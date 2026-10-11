@@ -3,13 +3,14 @@ import re
 from uuid import UUID
 
 import psycopg
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from .. import db
 from ..auth import auditar, requer
 from ..pagamento import formulario
-from ..web import TZ, checar_csrf, mensagem_do_banco, tela
+from ..web import TZ_SQL, checar_csrf, mensagem_do_banco, tela
 from .caixa import CATEGORIAS
 from .clientes import cpf_valido
 
@@ -53,14 +54,14 @@ def _ler(form: dict) -> tuple[dict, str | None]:
 def lista(request: Request, q: str = "", usuario: dict = Depends(requer("fornecedores.editar", "caixa.saida"))):
     q = q.strip()[:60]
     with db.transacao(usuario_id=usuario["id"]) as cur:
-        cur.execute(f"""SELECT f.id::text AS id, f.nome, f.categoria, f.telefone, f.ativo,
+        cur.execute(sql.SQL("""SELECT f.id::text AS id, f.nome, f.categoria, f.telefone, f.ativo,
                                COALESCE(sum(CASE WHEN t.tipo = 'SAIDA' THEN t.valor_centavos ELSE -t.valor_centavos END)
                                         FILTER (WHERE t.criado_em > now() - interval '12 months'), 0) AS pago_12m,
-                               to_char(max(t.criado_em) AT TIME ZONE '{TZ}', 'DD/MM/YYYY') AS ultimo
+                               to_char(max(t.criado_em) AT TIME ZONE {tz}, 'DD/MM/YYYY') AS ultimo
                           FROM fornecedores f LEFT JOIN transacoes t ON t.fornecedor_id = f.id
                          WHERE %(q)s = '' OR f_unaccent(lower(f.nome)) LIKE f_unaccent(lower(%(like)s))
                             OR f.documento = %(dig)s
-                         GROUP BY f.id ORDER BY f.ativo DESC, f.nome LIMIT 300""",
+                         GROUP BY f.id ORDER BY f.ativo DESC, f.nome LIMIT 300""").format(tz=TZ_SQL),
                     {"q": q, "like": f"%{q}%", "dig": re.sub(r"\D", "", q) or "#"})
         itens = cur.fetchall()
     return tela(request, "fornecedores_lista.html", usuario, itens=itens, q=q)
@@ -101,9 +102,9 @@ def detalhe(request: Request, fid: UUID, ok: int = 0,
         f = _carregar(cur, str(fid))
         if not f:
             return tela(request, "erro.html", usuario, status=404, titulo="Fornecedor não encontrado")
-        cur.execute(f"""SELECT t.id, t.tipo, t.natureza, t.valor_centavos, t.forma_pagamento, t.parcelas, t.descricao,
-                               t.documento, t.anexo, to_char(t.criado_em AT TIME ZONE '{TZ}', 'DD/MM/YYYY') AS quando
-                          FROM transacoes t WHERE t.fornecedor_id = %s ORDER BY t.id DESC LIMIT 100""", (str(fid),))
+        cur.execute(sql.SQL("""SELECT t.id, t.tipo, t.natureza, t.valor_centavos, t.forma_pagamento, t.parcelas, t.descricao,
+                               t.documento, t.anexo, to_char(t.criado_em AT TIME ZONE {tz}, 'DD/MM/YYYY') AS quando
+                          FROM transacoes t WHERE t.fornecedor_id = %s ORDER BY t.id DESC LIMIT 100""").format(tz=TZ_SQL), (str(fid),))
         pagos = cur.fetchall()
     return tela(request, "fornecedor_form.html", usuario, v=f, f=f, pagos=pagos, ok=ok, CATEGORIAS=CATEGORIAS)
 

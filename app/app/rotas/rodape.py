@@ -6,6 +6,7 @@ from urllib.parse import quote, quote_plus
 from uuid import UUID
 
 import psycopg
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
@@ -140,8 +141,9 @@ def embed_mapa(u: dict) -> str:
 
 
 def unidades(cur, todas: bool = False) -> list[dict]:
-    cur.execute(f"""SELECT id::text, nome, endereco, cidade, telefone, whatsapp, horario, mapa_link, principal, ativa, ordem
-                      FROM unidades {'' if todas else 'WHERE ativa'} ORDER BY ativa DESC, principal DESC, ordem, nome""")
+    cur.execute(sql.SQL("""SELECT id::text, nome, endereco, cidade, telefone, whatsapp, horario, mapa_link, principal, ativa, ordem
+                      FROM unidades {} ORDER BY ativa DESC, principal DESC, ordem, nome""")
+                .format(sql.SQL("" if todas else "WHERE ativa")))
     lista = cur.fetchall()
     for u in lista:
         u["mapa"], u["embed"] = link_mapa(u), embed_mapa(u)

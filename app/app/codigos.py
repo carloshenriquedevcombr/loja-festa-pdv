@@ -15,11 +15,13 @@ from . import code128, config
 def qr_svg(texto: str, rotulo: str = "QR code") -> Markup:
     q = segno.make(texto, error="m", micro=False)
     svg = q.svg_inline(scale=4, border=2, dark="#000", light="#fff", omitsize=True, svgclass="qr", lineclass=None)
-    return Markup(svg.replace("<svg ", f'<svg role="img" aria-label="{Markup.escape(rotulo)}" ', 1))
+    # SVG gerado pelo segno; o rótulo entra escapado
+    return Markup(svg.replace("<svg ", f'<svg role="img" aria-label="{Markup.escape(rotulo)}" ', 1))  # nosec B704
 
 
 def barras_svg(texto: str) -> Markup:
-    return Markup(code128.svg(texto, modulo=2.0, altura=60))
+    # SVG montado em code128.svg, texto escapado.
+    return Markup(code128.svg(texto, modulo=2.0, altura=60))  # nosec B704
 
 
 def codigo_pedido(pedido_id: str) -> str:

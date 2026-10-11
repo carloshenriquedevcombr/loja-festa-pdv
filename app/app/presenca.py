@@ -9,7 +9,10 @@ import re
 import threading
 import time
 
+from psycopg import sql
+
 JANELA_S = 180
+_JANELA = sql.SQL("make_interval(secs => {})").format(sql.Literal(JANELA_S))   # = interval 'JANELA_S seconds'
 _visitantes: dict[str, tuple[float, str]] = {}
 _trava = threading.Lock()
 
@@ -69,26 +72,26 @@ def visitantes_agora() -> list[str]:
 
 
 def online(cur) -> dict:
-    cur.execute(f"""SELECT DISTINCT ON (s.usuario_id) u.nome, s.pagina, s.descricao,
+    cur.execute(sql.SQL("""SELECT DISTINCT ON (s.usuario_id) u.nome, s.pagina, s.descricao,
                            to_char(s.criada_em AT TIME ZONE 'America/Sao_Paulo', 'HH24:MI') AS desde,
                            COALESCE((SELECT string_agg(p.nome, ', ' ORDER BY p.id) FROM usuario_papeis up
                                       JOIN papeis p ON p.id = up.papel_id
                                      WHERE up.usuario_id = u.id AND (up.valido_ate IS NULL OR up.valido_ate > now())), '') AS cargos
                       FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
                      WHERE s.encerrada_em IS NULL AND s.expira_em > now() AND NOT u.sistema
-                       AND s.visto_em > now() - interval '{JANELA_S} seconds'
-                     ORDER BY s.usuario_id, s.visto_em DESC""")
+                       AND s.visto_em > now() - {janela}
+                     ORDER BY s.usuario_id, s.visto_em DESC""").format(janela=_JANELA))
     equipe = sorted(cur.fetchall(), key=lambda r: r["nome"])
     for f in equipe:
         f["onde"] = rotulo_sistema(f["pagina"])
         f["cargos"] = f["cargos"].replace("Diretoria: ", "")
-    cur.execute(f"""SELECT DISTINCT ON (sc.conta_id) cl.nome, sc.pagina,
+    cur.execute(sql.SQL("""SELECT DISTINCT ON (sc.conta_id) cl.nome, sc.pagina,
                            to_char(sc.criada_em AT TIME ZONE 'America/Sao_Paulo', 'HH24:MI') AS desde
                       FROM sessoes_clientes sc JOIN contas_clientes c ON c.id = sc.conta_id
                       JOIN clientes cl ON cl.id = c.cliente_id
                      WHERE sc.encerrada_em IS NULL AND sc.expira_em > now()
-                       AND sc.visto_em > now() - interval '{JANELA_S} seconds'
-                     ORDER BY sc.conta_id, sc.visto_em DESC""")
+                       AND sc.visto_em > now() - {janela}
+                     ORDER BY sc.conta_id, sc.visto_em DESC""").format(janela=_JANELA))
     clientes = sorted(cur.fetchall(), key=lambda r: r["nome"])
     for c in clientes:
         c["onde"] = rotulo_site(c["pagina"])

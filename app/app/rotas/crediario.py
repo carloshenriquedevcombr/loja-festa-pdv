@@ -2,13 +2,14 @@
 from uuid import UUID
 
 import psycopg
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from .. import codigos, crediario, db, pagamento, pix
 from ..auth import auditar, pode, requer
 from ..pagamento import formulario
-from ..web import TZ, chave_valida, checar_csrf, e_chave_repetida, mensagem_do_banco, nova_chave, tela
+from ..web import TZ_SQL, chave_valida, checar_csrf, e_chave_repetida, mensagem_do_banco, nova_chave, tela
 from .caixa import filtro_cliente
 
 router = APIRouter()
@@ -21,13 +22,13 @@ def lista(request: Request, q: str = "", ver: str = "abertos", ok: str = "",
     ver = ver if ver in ("abertos", "vencidos", "todos") else "abertos"
     filtro, params = filtro_cliente(q)
     with db.transacao(usuario_id=usuario["id"]) as cur:
-        cur.execute(f"""
+        cur.execute(sql.SQL("""
             SELECT c.id::text AS id, cl.nome AS cliente, c.valor_centavos, c.parcelas, c.status, pr.sku,
                    count(p.id) FILTER (WHERE p.paga_em IS NOT NULL) AS pagas,
                    COALESCE(sum(p.valor_centavos) FILTER (WHERE p.paga_em IS NULL), 0) AS falta,
                    min(p.vencimento) FILTER (WHERE p.paga_em IS NULL) AS proximo,
                    count(p.id) FILTER (WHERE p.paga_em IS NULL
-                                        AND p.vencimento < (now() AT TIME ZONE '{TZ}')::date) AS vencidas
+                                        AND p.vencimento < (now() AT TIME ZONE {tz})::date) AS vencidas
               FROM crediarios c JOIN clientes cl ON cl.id = c.cliente_id
               JOIN crediario_parcelas p ON p.crediario_id = c.id
               LEFT JOIN pedidos pe ON pe.id = c.pedido_id LEFT JOIN produtos pr ON pr.id = pe.produto_id
@@ -35,9 +36,9 @@ def lista(request: Request, q: str = "", ver: str = "abertos", ok: str = "",
                AND (%(ver)s = 'todos' OR c.status = 'ATIVO')
              GROUP BY c.id, cl.nome, pr.sku
             HAVING %(ver)s <> 'vencidos' OR count(p.id) FILTER (WHERE p.paga_em IS NULL
-                                        AND p.vencimento < (now() AT TIME ZONE '{TZ}')::date) > 0
+                                        AND p.vencimento < (now() AT TIME ZONE {tz})::date) > 0
              ORDER BY min(p.vencimento) FILTER (WHERE p.paga_em IS NULL) NULLS LAST, c.criado_em DESC
-             LIMIT 200""", {**params, "q": q, "ver": ver})
+             LIMIT 200""").format(tz=TZ_SQL, filtro=sql.SQL(filtro)), {**params, "q": q, "ver": ver})
         itens = cur.fetchall()
         cur.execute("SELECT pix_chave, pix_nome, pix_cidade FROM lojas WHERE id = ctx_loja()")
         loja_pix = cur.fetchone()

@@ -110,7 +110,8 @@ def buscar_google(place_id: str) -> dict:
         headers={"X-Goog-Api-Key": config.GOOGLE_PLACES_KEY, "User-Agent": "loja-festa/1.0",
                  "X-Goog-FieldMask": "rating,userRatingCount,googleMapsUri,reviews"})
     try:
-        with urllib.request.urlopen(pedido, timeout=15) as r:
+        # API do Google Places (https do config).
+        with urllib.request.urlopen(pedido, timeout=15) as r:  # nosec B310
             dados = json.loads(r.read(2_000_000).decode() or "{}")
     except urllib.error.HTTPError as e:
         raise ErroGoogle(f"Google respondeu {e.code}") from e

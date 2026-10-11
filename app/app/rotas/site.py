@@ -12,6 +12,7 @@ from urllib.parse import quote, urlencode
 from uuid import UUID
 
 import psycopg
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
@@ -43,6 +44,11 @@ VISIVEL = """p.no_site AND p.status = 'DISPONIVEL' AND NOT EXISTS (
      WHERE pv.produto_id = p.id AND pv.status NOT IN ('CANCELADO','CONCLUIDO','RETIRADO','VENDIDO')
        AND ((pv.tipo = 'VENDA' AND lv.venda_ajuste_some)
          OR (pv.tipo = 'ALUGUEL' AND lv.alugada_no_site = 'ESCONDE')))"""
+
+
+def _card(resto: str, *partes) -> sql.Composed:
+    """SQL_CARD + o resto da consulta; os {} do resto recebem as partes (sql.SQL/Literal), na ordem."""
+    return sql.SQL(SQL_CARD) + sql.SQL(resto).format(*partes)
 
 
 def _loja(cur) -> dict:
@@ -120,7 +126,7 @@ def escolher_vitrines(ocasioes: list[dict], pecas: list[dict], limite: int = 8) 
 @router.get("/site")
 def inicio(request: Request):
     with db.transacao() as cur:
-        cur.execute(SQL_CARD + f" WHERE {VISIVEL} ORDER BY p.criado_em DESC LIMIT 8")
+        cur.execute(_card(" WHERE {} ORDER BY p.criado_em DESC LIMIT 8", sql.SQL(VISIVEL)))
         novidades = _cards(cur.fetchall())
         # "Escolha pela ocasião": cada peça aparece em UMA ocasião só (a ocasião principal dela), sem repetir foto
         cur.execute("""SELECT o.id, o.nome, o.slug, o.pai_id, pai.slug AS pai_slug
@@ -128,11 +134,11 @@ def inicio(request: Request):
                         WHERE o.ativa AND (pai.id IS NULL OR pai.ativa)
                         ORDER BY coalesce(pai.ordem, o.ordem), o.pai_id NULLS FIRST, o.ordem""")
         ocasioes = cur.fetchall()
-        cur.execute(f"""SELECT p.id, p.ocasiao_principal,
+        cur.execute(sql.SQL("""SELECT p.id, p.ocasiao_principal,
                                (SELECT f.arquivo FROM produto_fotos f WHERE f.produto_id = p.id AND f.ativa
                                  ORDER BY f.ordem LIMIT 1) AS foto
-                          FROM produtos p WHERE {VISIVEL} AND p.ocasiao_principal IS NOT NULL
-                         ORDER BY p.criado_em DESC LIMIT 400""")
+                          FROM produtos p WHERE {} AND p.ocasiao_principal IS NOT NULL
+                         ORDER BY p.criado_em DESC LIMIT 400""").format(sql.SQL(VISIVEL)))
         pecas = [x for x in cur.fetchall() if x["foto"]]
         vitrines = escolher_vitrines(ocasioes, pecas)
         destaque = next((p for p in novidades if p["capa"]), None)
@@ -221,21 +227,23 @@ def _colecao(request: Request, grupo: str | None = None, sub: str | None = None)
                              AND pe.periodo_bloqueado && daterange(%(dia)s::date - 1, %(dia)s::date + 1, '[]'))""")
             params["dia"] = dia
         onde = " AND ".join(cond)
-        cur.execute(f"SELECT count(*) AS n FROM produtos p WHERE {onde}", params)
+        cur.execute(sql.SQL("SELECT count(*) AS n FROM produtos p WHERE {}").format(sql.SQL(onde)), params)
         total = cur.fetchone()["n"]
-        cur.execute(SQL_CARD + f" WHERE {onde} ORDER BY {ORDENS[filtros['ordem']]} LIMIT {POR_PAGINA} OFFSET %(off)s",
+        cur.execute(_card(" WHERE {} ORDER BY {} LIMIT {} OFFSET %(off)s",
+                          sql.SQL(onde), sql.SQL(ORDENS[filtros["ordem"]]), sql.Literal(POR_PAGINA)),
                     {**params, "off": (pagina - 1) * POR_PAGINA})
         pecas = _cards(cur.fetchall())
         # Opções dos filtros: só o que existe nesta ocasião
         base_cond = " AND ".join([VISIVEL] + (["p.ocasioes && %(ocasioes)s::smallint[]"] if ocasiao_ids is not None else []))
         base_params = {"ocasioes": ocasiao_ids} if ocasiao_ids is not None else {}
-        cur.execute(f"""SELECT DISTINCT t FROM produtos p,
+        cur.execute(sql.SQL("""SELECT DISTINCT t FROM produtos p,
                                unnest(string_to_array(upper(replace(p.tamanho, ' ', '')), ',')) AS t
-                         WHERE {base_cond} AND p.tamanho IS NOT NULL AND t <> ''
-                         ORDER BY 1""", base_params)
+                         WHERE {} AND p.tamanho IS NOT NULL AND t <> ''
+                         ORDER BY 1""").format(sql.SQL(base_cond)), base_params)
         tamanhos = [r["t"] for r in cur.fetchall()][:30]
-        cur.execute(f"""SELECT initcap(lower(p.cor)) AS c, count(*) FROM produtos p
-                         WHERE {base_cond} AND p.cor IS NOT NULL GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 16""", base_params)
+        cur.execute(sql.SQL("""SELECT initcap(lower(p.cor)) AS c, count(*) FROM produtos p
+                         WHERE {} AND p.cor IS NOT NULL GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 16""").format(sql.SQL(base_cond)),
+                    base_params)
         cores = [r["c"] for r in cur.fetchall()]
         subs = []
         if grupo:
@@ -268,8 +276,8 @@ def colecao_sub(request: Request, grupo: str, sub: str):
 # Peça
 # --------------------------------------------------------------------------- #
 def _peca_publica(cur, slug: str):
-    cur.execute(SQL_CARD.replace("SELECT p.id::text,", "SELECT p.id::text, p.descricao, p.ocasioes,")
-                + f" WHERE {VISIVEL} AND p.slug = %s", (slug[:160],))
+    cur.execute(sql.SQL(SQL_CARD.replace("SELECT p.id::text,", "SELECT p.id::text, p.descricao, p.ocasioes,"))
+                + sql.SQL(" WHERE {} AND p.slug = %s").format(sql.SQL(VISIVEL)), (slug[:160],))
     return cur.fetchone()
 
 
@@ -320,8 +328,8 @@ def peca(request: Request, slug: str, data: str = "", sacola_erro: str = ""):
                     consulta = {"dia": dia, "livre": disponivel_em(cur, p["id"], dia)}
             except ValueError:
                 consulta = {"erro": "Data inválida."}
-        cur.execute(SQL_CARD + f""" WHERE {VISIVEL} AND p.id <> %s AND p.ocasioes && %s::smallint[]
-                                     ORDER BY p.criado_em DESC LIMIT 4""", (p["id"], p["ocasioes"] or [0]))
+        cur.execute(_card(""" WHERE {} AND p.id <> %s AND p.ocasioes && %s::smallint[]
+                                     ORDER BY p.criado_em DESC LIMIT 4""", sql.SQL(VISIVEL)), (p["id"], p["ocasioes"] or [0]))
         parecidas = _cards(cur.fetchall())
         loja = _loja(cur)
         texto = f"Olá! Vi no site a peça {p['nome']} ({p['sku']}) e quero saber mais."
