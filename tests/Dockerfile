@@ -1,7 +1,7 @@
 # Imagem para rodar TODOS os testes sem instalar nada no PC:
 # travas do banco, app de ponta a ponta (cada cargo, cada botão) e backup/restauração.
 # Contexto de build: raiz do repositório.
-FROM postgres:16-bookworm
+FROM postgres:18-bookworm
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 python3-venv \
