@@ -12,6 +12,8 @@ import os, subprocess, sys, uuid
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
+# O servidor responde no idioma dele (pt_BR na imagem do banco); as checagens comparam a mensagem em inglês
+os.environ["PGOPTIONS"] = os.environ.get("PGOPTIONS", "-c client_min_messages=warning") + " -c lc_messages=C"
 TEST_DB = os.environ.get("TEST_DB", "loja_teste")
 if not TEST_DB.endswith("_teste"):
     sys.exit("TEST_DB precisa terminar em _teste (proteção contra apagar produção).")
