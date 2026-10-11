@@ -1,7 +1,7 @@
 # Versões fixadas: são as usadas nos testes de ponta a ponta (tests/test_app.py).
 # O CI roda pip-audit e aponta qualquer uma com falha de segurança conhecida.
 fastapi==0.141.1
-starlette==1.3.1
+starlette==1.7.0
 pydantic==2.13.3
 uvicorn[standard]==0.46.0
 jinja2==3.1.6
