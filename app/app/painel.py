@@ -2,10 +2,12 @@
 import calendar
 from datetime import date, timedelta
 
-from . import presenca
-from .web import FORMAS, TZ, brl
+from psycopg import sql
 
-HOJE = f"(now() AT TIME ZONE '{TZ}')::date"
+from . import presenca
+from .web import FORMAS, TZ_SQL, brl
+
+HOJE = sql.SQL("(now() AT TIME ZONE {tz})::date").format(tz=TZ_SQL)
 TIPOS_AGENDA = {"PROVA_1": "1ª prova", "PROVA_2": "2ª prova", "RETIRADA": "Retirada", "DEVOLUCAO": "Devolução",
                 "PROVA_SITE": "Prova (site)"}
 
@@ -46,15 +48,15 @@ def _calendario(hoje: date, marcados: set[date]) -> dict:
 def montar(cur, usuario: dict) -> dict:
     perms = usuario["permissoes"]
     r: dict = {"kpis": []}
-    cur.execute(f"SELECT {HOJE} AS hoje")
+    cur.execute(sql.SQL("SELECT {hoje} AS hoje").format(hoje=HOJE))
     hoje = cur.fetchone()["hoje"]
     r["hoje"] = hoje
 
     if perms & {"caixa.fechar", "relatorios.completo"}:
-        cur.execute(f"""SELECT COALESCE(sum(valor_centavos) FILTER (WHERE tipo = 'ENTRADA'), 0) AS entrou,
+        cur.execute(sql.SQL("""SELECT COALESCE(sum(valor_centavos) FILTER (WHERE tipo = 'ENTRADA'), 0) AS entrou,
                                COALESCE(sum(valor_centavos) FILTER (WHERE tipo = 'SAIDA'), 0) AS saiu,
                                count(*) FILTER (WHERE tipo = 'ENTRADA') AS n_entrou
-                          FROM transacoes WHERE (criado_em AT TIME ZONE '{TZ}')::date = {HOJE}""")
+                          FROM transacoes WHERE (criado_em AT TIME ZONE {tz})::date = {hoje}""").format(tz=TZ_SQL, hoje=HOJE))
         c = cur.fetchone()
         r["caixa"] = c
         r["kpis"] += [
@@ -62,19 +64,19 @@ def montar(cur, usuario: dict) -> dict:
              "extra": f"{c['n_entrou']} recebimento{'s' if c['n_entrou'] != 1 else ''}", "url": "/caixa"},
             {"cor": "vinho", "icone": "dinheiro_sai", "rotulo": "Saiu hoje", "valor": brl(c["saiu"]),
              "extra": f"Saldo do dia {brl(c['entrou'] - c['saiu'])}", "url": "/caixa"}]
-        cur.execute(f"""SELECT (criado_em AT TIME ZONE '{TZ}')::date AS dia,
+        cur.execute(sql.SQL("""SELECT (criado_em AT TIME ZONE {tz})::date AS dia,
                                sum(CASE WHEN tipo = 'ENTRADA' THEN valor_centavos ELSE -valor_centavos END)
                                  FILTER (WHERE natureza <> 'DESPESA' AND natureza <> 'DEVOLUCAO_CLIENTE') AS valor
                           FROM transacoes WHERE criado_em > now() - interval '15 days'
-                         GROUP BY 1""")
+                         GROUP BY 1""").format(tz=TZ_SQL))
         r["grafico"] = _grafico_dias([{"dia": l["dia"], "valor": max(l["valor"] or 0, 0)} for l in cur.fetchall()], hoje)
-        cur.execute(f"""SELECT forma_pagamento AS forma,
+        cur.execute(sql.SQL("""SELECT forma_pagamento AS forma,
                                sum(CASE WHEN tipo = 'ENTRADA' THEN valor_centavos ELSE -valor_centavos END) AS valor
                           FROM transacoes
-                         WHERE date_trunc('month', criado_em AT TIME ZONE '{TZ}') = date_trunc('month', {HOJE}::timestamp)
+                         WHERE date_trunc('month', criado_em AT TIME ZONE {tz}) = date_trunc('month', {hoje}::timestamp)
                            AND natureza NOT IN ('DESPESA','DEVOLUCAO_CLIENTE')
                          GROUP BY 1 HAVING sum(CASE WHEN tipo = 'ENTRADA' THEN valor_centavos ELSE -valor_centavos END) > 0
-                         ORDER BY 2 DESC""")
+                         ORDER BY 2 DESC""").format(tz=TZ_SQL, hoje=HOJE))
         formas = cur.fetchall()
         total = sum(f["valor"] for f in formas) or 1
         r["formas"] = [{"nome": FORMAS.get(f["forma"], f["forma"]), "valor": brl(f["valor"]),
@@ -82,16 +84,16 @@ def montar(cur, usuario: dict) -> dict:
         r["formas_total"] = brl(sum(f["valor"] for f in formas))
 
     if "pedidos.ver" in perms:
-        cur.execute(f"""
+        cur.execute(sql.SQL("""
             SELECT count(*) AS ativos,
-                   count(*) FILTER (WHERE (status = 'PRONTO' AND data_retirada <= {HOJE})
-                                       OR (status = 'ALUGADO' AND data_devolucao <= {HOJE})) AS hoje,
-                   count(*) FILTER (WHERE status = 'PRONTO' AND data_retirada <= {HOJE}) AS retiradas,
-                   count(*) FILTER (WHERE status = 'ALUGADO' AND data_devolucao <= {HOJE}) AS devolucoes,
-                   count(*) FILTER (WHERE status = 'ALUGADO' AND data_devolucao < {HOJE}) AS atrasadas,
+                   count(*) FILTER (WHERE (status = 'PRONTO' AND data_retirada <= {hoje})
+                                       OR (status = 'ALUGADO' AND data_devolucao <= {hoje})) AS hoje,
+                   count(*) FILTER (WHERE status = 'PRONTO' AND data_retirada <= {hoje}) AS retiradas,
+                   count(*) FILTER (WHERE status = 'ALUGADO' AND data_devolucao <= {hoje}) AS devolucoes,
+                   count(*) FILTER (WHERE status = 'ALUGADO' AND data_devolucao < {hoje}) AS atrasadas,
                    count(*) FILTER (WHERE status IN ('RESERVADO','PROVA_1','EM_AJUSTE','PROVA_2')
-                                      AND data_retirada <= {HOJE} + 3) AS urgentes
-              FROM pedidos WHERE status NOT IN ('CANCELADO','CONCLUIDO','RETIRADO','VENDIDO')""")
+                                      AND data_retirada <= {hoje} + 3) AS urgentes
+              FROM pedidos WHERE status NOT IN ('CANCELADO','CONCLUIDO','RETIRADO','VENDIDO')""").format(hoje=HOJE))
         p = cur.fetchone()
         r["pedidos"] = p
         r["kpis"] += [
@@ -102,42 +104,43 @@ def montar(cur, usuario: dict) -> dict:
         if p["atrasadas"]:
             r["kpis"].append({"cor": "alerta-kpi", "icone": "alerta", "rotulo": "Devolução atrasada", "valor": p["atrasadas"],
                               "extra": "ver a lista", "url": "/pedidos?filtro=atrasados"})
-        cur.execute(f"""SELECT pe.id::text AS id, pr.sku, pr.nome AS peca, cl.nome AS cliente, pe.status,
+        cur.execute(sql.SQL("""SELECT pe.id::text AS id, pr.sku, pr.nome AS peca, cl.nome AS cliente, pe.status,
                                CASE WHEN pe.status = 'ALUGADO' THEN pe.data_devolucao ELSE pe.data_retirada END AS dia,
                                CASE WHEN pe.status = 'ALUGADO' THEN 'Devolução' ELSE 'Retirada' END AS o_que
                           FROM pedidos pe JOIN produtos pr ON pr.id = pe.produto_id LEFT JOIN clientes cl ON cl.id = pe.cliente_id
                          WHERE pe.status NOT IN ('CANCELADO','CONCLUIDO','RETIRADO','VENDIDO','DEVOLVIDO','EM_LIMPEZA',
                                                  'AGUARDANDO_PAGAMENTO')
                            AND (CASE WHEN pe.status = 'ALUGADO' THEN pe.data_devolucao ELSE pe.data_retirada END)
-                               BETWEEN {HOJE} - 30 AND {HOJE} + 7
-                         ORDER BY dia LIMIT 8""")
+                               BETWEEN {hoje} - 30 AND {hoje} + 7
+                         ORDER BY dia LIMIT 8""").format(hoje=HOJE))
         r["proximos"] = cur.fetchall()
-        cur.execute(f"""SELECT count(*) AS n FROM compras_site WHERE status = 'PAGA' AND pago_em > now() - interval '7 days'""")
+        cur.execute("""SELECT count(*) AS n FROM compras_site WHERE status = 'PAGA' AND pago_em > now() - interval '7 days'""")
         site7 = cur.fetchone()["n"]
         if site7:
             r["kpis"].append({"cor": "creme", "icone": "sacola", "rotulo": "Compras pelo site (7 dias)", "valor": site7,
                               "extra": "ver em Pedidos → Do site", "url": "/pedidos?filtro=site"})
 
     if "caixa.entrada" in perms:
-        cur.execute(f"""SELECT count(*) AS n, COALESCE(sum(p.valor_centavos), 0) AS valor
+        cur.execute(sql.SQL("""SELECT count(*) AS n, COALESCE(sum(p.valor_centavos), 0) AS valor
                           FROM crediario_parcelas p JOIN crediarios c ON c.id = p.crediario_id
-                         WHERE c.status = 'ATIVO' AND p.paga_em IS NULL AND p.vencimento < {HOJE}""")
+                         WHERE c.status = 'ATIVO' AND p.paga_em IS NULL AND p.vencimento < {hoje}""").format(hoje=HOJE))
         v = cur.fetchone()
         if v["n"]:
             r["kpis"].append({"cor": "vinho", "icone": "carne", "rotulo": "Parcelas vencidas (crediário)", "valor": v["n"],
                               "extra": brl(v["valor"]), "url": "/crediario?ver=vencidos"})
 
     if "agenda.ver" in perms:
-        cur.execute(f"""SELECT to_char(a.inicio AT TIME ZONE '{TZ}', 'HH24:MI') AS hora, a.tipo, cl.nome AS cliente,
+        cur.execute(sql.SQL("""SELECT to_char(a.inicio AT TIME ZONE {tz}, 'HH24:MI') AS hora, a.tipo, cl.nome AS cliente,
                                pr.sku, a.pedido_id::text AS pedido_id
                           FROM agendamentos a JOIN pedidos p ON p.id = a.pedido_id JOIN produtos pr ON pr.id = p.produto_id
                           LEFT JOIN clientes cl ON cl.id = p.cliente_id
-                         WHERE a.status IN ('AGENDADO','REMARCADO') AND (a.inicio AT TIME ZONE '{TZ}')::date = {HOJE}
-                         ORDER BY a.inicio LIMIT 10""")
+                         WHERE a.status IN ('AGENDADO','REMARCADO') AND (a.inicio AT TIME ZONE {tz})::date = {hoje}
+                         ORDER BY a.inicio LIMIT 10""").format(tz=TZ_SQL, hoje=HOJE))
         r["agenda"] = [{**a, "tipo_nome": TIPOS_AGENDA.get(a["tipo"], a["tipo"].title())} for a in cur.fetchall()]
-        cur.execute(f"""SELECT DISTINCT (inicio AT TIME ZONE '{TZ}')::date AS dia FROM agendamentos
+        cur.execute(sql.SQL("""SELECT DISTINCT (inicio AT TIME ZONE {tz})::date AS dia FROM agendamentos
                          WHERE status IN ('AGENDADO','REMARCADO')
-                           AND date_trunc('month', inicio AT TIME ZONE '{TZ}') = date_trunc('month', {HOJE}::timestamp)""")
+                           AND date_trunc('month', inicio AT TIME ZONE {tz}) = date_trunc('month', {hoje}::timestamp)""")
+                    .format(tz=TZ_SQL, hoje=HOJE))
         r["calendario"] = _calendario(hoje, {l["dia"] for l in cur.fetchall()})
 
     if "site.solicitacoes" in perms:

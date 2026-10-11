@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import psycopg.errors as pgerr
+from psycopg import sql
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
@@ -18,6 +19,7 @@ FORMAS = {"DINHEIRO": "Dinheiro", "PIX": "PIX", "DEBITO": "Débito", "CREDITO": 
 EM_FORMA = {"DINHEIRO": "em dinheiro", "PIX": "no PIX", "DEBITO": "no débito", "CREDITO": "no crédito",
             "BOLETO": "no boleto", "CARNE": "no carnê", "CREDIARIO": "no crediário da loja"}
 TZ = "America/Sao_Paulo"
+TZ_SQL = sql.Literal(TZ)   # fuso já pronto para compor consultas (psycopg.sql)
 
 
 # --------------------------------------------------------------------------- #

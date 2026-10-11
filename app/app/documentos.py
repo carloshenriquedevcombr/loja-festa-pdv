@@ -17,8 +17,10 @@ Blocos:
 """
 from datetime import date
 
+from psycopg import sql
+
 from . import cripto
-from .web import EM_FORMA, FORMAS, TZ, brl, cpf, data_br, telefone
+from .web import EM_FORMA, FORMAS, TZ_SQL, brl, cpf, data_br, telefone
 
 COMPROMISSOS = {"PROVA_1": "1ª prova", "PROVA_2": "2ª prova", "RETIRADA": "Retirada", "DEVOLUCAO": "Devolução"}
 SITUACAO_AGENDA = {"AGENDADO": "marcado", "REMARCADO": "remarcado", "FEITO": "feito", "FALTOU": "faltou",
@@ -29,9 +31,9 @@ from . import config  # noqa: E402
 
 
 def _loja(cur) -> dict:
-    cur.execute(f"""SELECT nome, cnpj, endereco, telefone, rodape_comprovante, logo_arquivo,
-                           to_char(now() AT TIME ZONE '{TZ}', 'DD/MM/YYYY HH24:MI') AS agora
-                      FROM lojas WHERE id = ctx_loja()""")
+    cur.execute(sql.SQL("""SELECT nome, cnpj, endereco, telefone, rodape_comprovante, logo_arquivo,
+                           to_char(now() AT TIME ZONE {tz}, 'DD/MM/YYYY HH24:MI') AS agora
+                      FROM lojas WHERE id = ctx_loja()""").format(tz=TZ_SQL))
     loja = cur.fetchone()
     if loja["cnpj"]:
         c = loja["cnpj"]
@@ -56,15 +58,15 @@ def _tipo_nome(p) -> str:
 
 # --------------------------------------------------------------------------- #
 def pedido(cur, pid, status_nomes: dict, mascarar=lambda t: t, publico: bool = False, base: str = "") -> dict | None:
-    cur.execute(f"""
+    cur.execute(sql.SQL("""
         SELECT pe.*, pe.id::text AS id, pr.sku, pr.nome AS peca, pr.tamanho, pr.cor,
                cl.nome AS cliente, cl.telefone_c, cl.cpf_c, cl.endereco_c, u.nome AS atendente,
-               to_char(pe.criado_em AT TIME ZONE '{TZ}', 'DD/MM/YYYY HH24:MI') AS criado,
+               to_char(pe.criado_em AT TIME ZONE {tz}, 'DD/MM/YYYY HH24:MI') AS criado,
                valor_pago(pe.id) AS pago, pe.valor_total_centavos - valor_pago(pe.id) AS saldo
           FROM pedidos pe JOIN produtos pr ON pr.id = pe.produto_id
           JOIN usuarios u ON u.id = pe.criado_por
           LEFT JOIN clientes cl ON cl.id = pe.cliente_id
-         WHERE pe.id = %s""", (pid,))
+         WHERE pe.id = %s""").format(tz=TZ_SQL), (pid,))
     p = cripto.abrir(cur.fetchone(), "clientes", "telefone", "cpf", "endereco")
     if not p:
         return None
@@ -84,9 +86,9 @@ def pedido(cur, pid, status_nomes: dict, mascarar=lambda t: t, publico: bool = F
         pares.append(("Festa", data_br(p["data_festa"]), False))
     b.append({"t": "pares", "itens": pares})
 
-    cur.execute(f"""SELECT tipo, status, to_char(inicio AT TIME ZONE '{TZ}', 'DD/MM/YYYY') AS dia,
-                           to_char(inicio AT TIME ZONE '{TZ}', 'HH24:MI') AS hora
-                      FROM agendamentos WHERE pedido_id = %s AND status <> 'CANCELADO' ORDER BY inicio""", (pid,))
+    cur.execute(sql.SQL("""SELECT tipo, status, to_char(inicio AT TIME ZONE {tz}, 'DD/MM/YYYY') AS dia,
+                           to_char(inicio AT TIME ZONE {tz}, 'HH24:MI') AS hora
+                      FROM agendamentos WHERE pedido_id = %s AND status <> 'CANCELADO' ORDER BY inicio""").format(tz=TZ_SQL), (pid,))
     agenda = cur.fetchall()
     if agenda:
         b.append({"t": "secao", "texto": "Agenda"})
@@ -102,9 +104,9 @@ def pedido(cur, pid, status_nomes: dict, mascarar=lambda t: t, publico: bool = F
                 ("Falta pagar" if p["saldo"] > 0 else "Situação", brl(p["saldo"]) if p["saldo"] > 0 else "QUITADO", True)]
     b.append({"t": "pares", "itens": valores})
 
-    cur.execute(f"""SELECT t.id, t.tipo, t.valor_centavos, t.forma_pagamento, t.parcelas,
-                           to_char(t.criado_em AT TIME ZONE '{TZ}', 'DD/MM/YY') AS dia
-                      FROM transacoes t WHERE t.pedido_id = %s ORDER BY t.id""", (pid,))
+    cur.execute(sql.SQL("""SELECT t.id, t.tipo, t.valor_centavos, t.forma_pagamento, t.parcelas,
+                           to_char(t.criado_em AT TIME ZONE {tz}, 'DD/MM/YY') AS dia
+                      FROM transacoes t WHERE t.pedido_id = %s ORDER BY t.id""").format(tz=TZ_SQL), (pid,))
     pags = cur.fetchall()
     if pags:
         b.append({"t": "secao", "texto": "Pagamentos"})
@@ -158,15 +160,15 @@ def _contrato(cur, d: dict, p: dict, publico: bool) -> None:
 
 # --------------------------------------------------------------------------- #
 def recibo(cur, tid: int, mascarar=lambda t: t) -> dict | None:
-    cur.execute(f"""
+    cur.execute(sql.SQL("""
         SELECT t.*, u.nome AS quem, m.apelido AS maquininha, pr.sku, pr.nome AS peca, cl.nome AS cliente,
-               pe.id::text AS pedido, to_char(t.criado_em AT TIME ZONE '{TZ}', 'DD/MM/YYYY HH24:MI') AS quando
+               pe.id::text AS pedido, to_char(t.criado_em AT TIME ZONE {tz}, 'DD/MM/YYYY HH24:MI') AS quando
           FROM transacoes t JOIN usuarios u ON u.id = t.usuario_id
           LEFT JOIN maquininhas m ON m.id = t.maquininha_id
           LEFT JOIN pedidos pe ON pe.id = t.pedido_id
           LEFT JOIN produtos pr ON pr.id = pe.produto_id
           LEFT JOIN clientes cl ON cl.id = pe.cliente_id
-         WHERE t.id = %s""", (tid,))
+         WHERE t.id = %s""").format(tz=TZ_SQL), (tid,))
     t = cur.fetchone()
     if not t:
         return None
@@ -205,13 +207,13 @@ def recibo(cur, tid: int, mascarar=lambda t: t) -> dict | None:
 
 # --------------------------------------------------------------------------- #
 def extrato_caixa(cur, de: date, ate: date) -> dict:
-    cur.execute(f"""
+    cur.execute(sql.SQL("""
         SELECT t.id, t.tipo, t.natureza, t.valor_centavos, t.forma_pagamento, t.parcelas, t.descricao, t.estorno_de,
-               to_char(t.criado_em AT TIME ZONE '{TZ}', 'DD/MM HH24:MI') AS quando, u.nome AS quem,
+               to_char(t.criado_em AT TIME ZONE {tz}, 'DD/MM HH24:MI') AS quando, u.nome AS quem,
                EXISTS (SELECT 1 FROM transacoes e WHERE e.estorno_de = t.id) AS desfeito
           FROM transacoes t JOIN usuarios u ON u.id = t.usuario_id
-         WHERE (t.criado_em AT TIME ZONE '{TZ}')::date BETWEEN %s AND %s
-         ORDER BY t.id""", (de, ate))
+         WHERE (t.criado_em AT TIME ZONE {tz})::date BETWEEN %s AND %s
+         ORDER BY t.id""").format(tz=TZ_SQL), (de, ate))
     lanc = cur.fetchall()
     periodo = data_br(de) if de == ate else f"{data_br(de)} a {data_br(ate)}"
     d = _doc(cur, "Extrato do caixa", None)
@@ -257,11 +259,11 @@ def extrato_cliente(cur, cid, status_nomes: dict, mascarar=lambda t: t) -> dict 
         pares.append(("Telefone", telefone(mascarar(c["telefone"])), False))
     if c["cpf"]:
         pares.append(("CPF", cpf(mascarar(c["cpf"])), False))
-    cur.execute(f"""
+    cur.execute(sql.SQL("""
         SELECT p.id::text, p.tipo, p.com_ajuste, p.status, p.valor_total_centavos, pr.sku, pr.nome AS peca,
-               valor_pago(p.id) AS pago, to_char(p.criado_em AT TIME ZONE '{TZ}', 'DD/MM/YY') AS dia
+               valor_pago(p.id) AS pago, to_char(p.criado_em AT TIME ZONE {tz}, 'DD/MM/YY') AS dia
           FROM pedidos p JOIN produtos pr ON pr.id = p.produto_id
-         WHERE p.cliente_id = %s ORDER BY p.criado_em""", (cid,))
+         WHERE p.cliente_id = %s ORDER BY p.criado_em""").format(tz=TZ_SQL), (cid,))
     pedidos = cur.fetchall()
     ativos = [p for p in pedidos if p["status"] != "CANCELADO"]
     falta = sum(p["valor_total_centavos"] - p["pago"] for p in ativos if p["valor_total_centavos"] > p["pago"])
@@ -278,11 +280,11 @@ def extrato_cliente(cur, cid, status_nomes: dict, mascarar=lambda t: t) -> dict 
                               "-" if p["status"] == "CANCELADO" else brl(max(p["valor_total_centavos"] - p["pago"], 0))]
                              for p in pedidos],
                   "total": None})
-        cur.execute(f"""
+        cur.execute(sql.SQL("""
             SELECT t.id, t.tipo, t.valor_centavos, t.forma_pagamento, t.parcelas, pr.sku,
-                   to_char(t.criado_em AT TIME ZONE '{TZ}', 'DD/MM/YY') AS dia
+                   to_char(t.criado_em AT TIME ZONE {tz}, 'DD/MM/YY') AS dia
               FROM transacoes t JOIN pedidos p ON p.id = t.pedido_id JOIN produtos pr ON pr.id = p.produto_id
-             WHERE p.cliente_id = %s ORDER BY t.id""", (cid,))
+             WHERE p.cliente_id = %s ORDER BY t.id""").format(tz=TZ_SQL), (cid,))
         pags = cur.fetchall()
         if pags:
             b.append({"t": "secao", "texto": "Pagamentos"})

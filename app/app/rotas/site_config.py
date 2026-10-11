@@ -2,6 +2,7 @@
 import re
 
 import psycopg
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote
@@ -109,9 +110,10 @@ def mudar_ocasiao(request: Request, oid: int, usuario: dict = Depends(requer("si
             cur.execute("SELECT id, pai_id, ordem FROM ocasioes WHERE id = %s", (oid,))
             o = cur.fetchone()
             if o:
-                cur.execute(f"""SELECT id, ordem FROM ocasioes WHERE pai_id IS NOT DISTINCT FROM %s AND id <> %s
-                                  AND ordem {'<=' if acao == 'subir' else '>='} %s
-                                ORDER BY ordem {'DESC' if acao == 'subir' else 'ASC'}, id LIMIT 1""",
+                cur.execute(sql.SQL("""SELECT id, ordem FROM ocasioes WHERE pai_id IS NOT DISTINCT FROM %s AND id <> %s
+                                  AND ordem {} %s
+                                ORDER BY ordem {}, id LIMIT 1""").format(
+                                sql.SQL("<=" if acao == "subir" else ">="), sql.SQL("DESC" if acao == "subir" else "ASC")),
                             (o["pai_id"], oid, o["ordem"]))
                 vizinho = cur.fetchone()
                 if vizinho:
@@ -233,7 +235,8 @@ def salvar_redes(request: Request, usuario: dict = Depends(requer("site.editar")
             return _tela_redes(request, usuario, form, status=400,
                                erro=f"{nome}: o link não parece certo. Exemplo: {exemplo}")
     with db.transacao(usuario_id=usuario["id"]) as cur:
-        cur.execute(f"UPDATE lojas SET {', '.join(f'{k} = %s' for k in valores)} WHERE id = ctx_loja()",
+        cur.execute(sql.SQL("UPDATE lojas SET {} WHERE id = ctx_loja()").format(
+                        sql.SQL(", ").join(sql.SQL("{} = %s").format(sql.Identifier(k)) for k in valores)),
                     tuple(valores.values()))
         auditar(cur, request, "redes_sociais_alteradas", usuario["id"], "loja")
     return RedirectResponse(f"/config/redes?ok={quote('Redes sociais salvas. Já aparecem no site.')}", status_code=303)

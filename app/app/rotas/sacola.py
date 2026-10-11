@@ -10,6 +10,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 import psycopg
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
@@ -17,7 +18,7 @@ from .. import contas, cripto, db, frete, pagamento, pagamento_online as po
 from ..pagamento import formulario
 from ..web import checar_csrf, mensagem_do_banco
 from .pedidos import DIAS_ANTES_PROVA
-from .site import SQL_CARD, VISIVEL, _cards, _loja
+from .site import VISIVEL, _card, _cards, _loja
 
 router = APIRouter()
 MAX_ITENS = 5
@@ -57,7 +58,7 @@ def conferir_item(cur, it: dict) -> tuple[dict | None, str | None]:
         pid = str(uuid.UUID(str(it.get("peca"))))
     except ValueError:
         return None, "Peça não encontrada."
-    cur.execute(SQL_CARD + f" WHERE {VISIVEL} AND p.id = %s", (pid,))
+    cur.execute(_card(" WHERE {} AND p.id = %s", sql.SQL(VISIVEL)), (pid,))
     p = cur.fetchone()
     if not p or not p["preco_no_site"]:
         return None, "Esta peça não está mais disponível pelo site."

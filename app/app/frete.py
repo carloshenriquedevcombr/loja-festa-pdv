@@ -11,6 +11,8 @@ import re
 import urllib.error
 import urllib.request
 
+from psycopg import sql
+
 from . import config
 
 
@@ -24,8 +26,8 @@ def cep_limpo(texto: str | None) -> str | None:
 
 
 def cidades(cur, aluguel: bool = False) -> list[dict]:
-    cur.execute(f"""SELECT id::text, cidade, uf, meio, valor_centavos, prazo, aluguel FROM entrega_cidades
-                     WHERE ativa {'AND aluguel' if aluguel else ''} ORDER BY cidade""")
+    cur.execute(sql.SQL("""SELECT id::text, cidade, uf, meio, valor_centavos, prazo, aluguel FROM entrega_cidades
+                     WHERE ativa {} ORDER BY cidade""").format(sql.SQL("AND aluguel" if aluguel else "")))
     return cur.fetchall()
 
 

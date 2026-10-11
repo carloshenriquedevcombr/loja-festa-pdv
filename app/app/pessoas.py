@@ -1,7 +1,18 @@
 """Dados pessoais de clientes e funcionários: gravar cifrado, ler aberto, achar pelo telefone."""
+from psycopg import sql
+
 from . import cripto
 
 CAMPOS_CLIENTE = ("telefone", "cpf", "email", "observacoes", "endereco")
+
+
+def _nomes(col) -> sql.Composed:
+    return sql.SQL(", ").join(sql.Identifier(k) for k in col)
+
+
+def _sets(col) -> sql.Composed:
+    """'a = %s, b = %s' com os nomes das colunas como identificadores."""
+    return sql.SQL(", ").join(sql.SQL("{} = %s").format(sql.Identifier(k)) for k in col)
 
 
 def colunas_cliente(d: dict) -> dict:
@@ -24,16 +35,16 @@ def gravar_cliente(cur, d: dict, cid: str | None = None, consentimento: bool = T
     """Cria (cid=None) ou atualiza a ficha. Nome em texto (para a busca); o resto cifrado."""
     col = colunas_cliente(d)
     if cid is None:
-        cur.execute(f"""INSERT INTO clientes (loja_id, nome, {', '.join(col)}, consentimento_lgpd_em)
-                        VALUES (ctx_loja(), %s, {', '.join(['%s'] * len(col))},
+        cur.execute(sql.SQL("""INSERT INTO clientes (loja_id, nome, {}, consentimento_lgpd_em)
+                        VALUES (ctx_loja(), %s, {},
                                 CASE WHEN %s THEN COALESCE(%s, now()) END)
-                        RETURNING id::text""",
+                        RETURNING id::text""").format(_nomes(col), sql.SQL(", ").join(sql.Placeholder() * len(col))),
                     (d["nome"], *col.values(), consentimento, consentimento_em))
         return cur.fetchone()["id"]
-    cur.execute(f"""UPDATE clientes SET nome = %s, {', '.join(f'{k} = %s' for k in col)},
+    cur.execute(sql.SQL("""UPDATE clientes SET nome = %s, {},
                            consentimento_lgpd_em = COALESCE(consentimento_lgpd_em, CASE WHEN %s THEN now() END),
                            atualizado_em = now()
-                     WHERE id = %s""", (d["nome"], *col.values(), consentimento, cid))
+                     WHERE id = %s""").format(_sets(col)), (d["nome"], *col.values(), consentimento, cid))
     return cid
 
 
@@ -69,8 +80,8 @@ def cifrar_pendentes(cur) -> int:
     for c in cur.fetchall():
         col = colunas_cliente(c)
         col.pop("endereco_c")
-        cur.execute(f"""UPDATE clientes SET {', '.join(f'{k} = %s' for k in col)},
-                               telefone = NULL, cpf = NULL, email = NULL, observacoes = NULL WHERE id = %s""",
+        cur.execute(sql.SQL("""UPDATE clientes SET {},
+                               telefone = NULL, cpf = NULL, email = NULL, observacoes = NULL WHERE id = %s""").format(_sets(col)),
                     (*col.values(), c["id"]))
         n += 1
     cur.execute("SELECT id, telefone, observacoes FROM usuarios WHERE telefone IS NOT NULL OR observacoes IS NOT NULL")

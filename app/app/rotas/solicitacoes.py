@@ -4,30 +4,31 @@ from datetime import date, time
 from urllib.parse import quote
 from uuid import UUID
 
+from psycopg import sql
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from .. import cripto, db, pessoas
 from ..auth import auditar, requer
 from ..pagamento import formulario
-from ..web import TZ, checar_csrf, tela
+from ..web import TZ_SQL, checar_csrf, tela
 
 router = APIRouter()
 PERIODO = {"MANHA": "manhã", "TARDE": "tarde"}
 
 
 def _lista(cur, status: tuple):
-    cur.execute(f"""
+    cur.execute(sql.SQL("""
         SELECT s.id::text, s.nome, s.telefone_c, s.data_evento, s.data_desejada, s.periodo, s.mensagem_c, s.status,
-               to_char(s.criado_em AT TIME ZONE '{TZ}', 'DD/MM HH24:MI') AS chegou,
-               to_char(s.agendada_para AT TIME ZONE '{TZ}', 'DD/MM/YYYY HH24:MI') AS quando,
+               to_char(s.criado_em AT TIME ZONE {tz}, 'DD/MM HH24:MI') AS chegou,
+               to_char(s.agendada_para AT TIME ZONE {tz}, 'DD/MM/YYYY HH24:MI') AS quando,
                p.id::text AS produto_id, p.sku, p.nome AS peca, p.slug, s.cliente_id::text AS cliente_id,
                (SELECT f.arquivo FROM produto_fotos f WHERE f.produto_id = p.id AND f.ativa
                  ORDER BY f.ordem LIMIT 1) AS capa, l.nome AS loja
           FROM solicitacoes_prova s LEFT JOIN produtos p ON p.id = s.produto_id JOIN lojas l ON l.id = s.loja_id
          WHERE s.status = ANY(%s)
          ORDER BY CASE WHEN s.status = 'NOVA' THEN s.criado_em END DESC, s.agendada_para DESC NULLS LAST
-         LIMIT 100""", (list(status),))
+         LIMIT 100""").format(tz=TZ_SQL), (list(status),))
     itens = cur.fetchall()
     for s in itens:
         s["telefone"] = cripto.decifrar(s.pop("telefone_c"), "solicitacoes.telefone")
