@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block cabeca %}<meta http-equiv="refresh" content="8;url=/">{% endblock %}
+{% block titulo %}Guardado{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito feito {{ 'saida' if t.tipo == 'SAIDA' else '' }}">
+  <div class="marca" aria-hidden="true">✓</div>
+  <h1>Guardado!</h1>
+  <p class="frase">{{ "Saída" if t.tipo == "SAIDA" else "Entrada" }} de <strong>{{ t.valor_centavos|brl }}</strong>
+     {{ EM_FORMA[t.forma_pagamento] }}{% if t.parcelas > 1 %} em {{ t.parcelas }}x{% endif %}{% if t.maquininha %} ({{ t.maquininha }}){% endif %}.</p>
+  <p class="suave">{{ t.descricao }}{% if t.fornecedor %} · {{ t.fornecedor }}{% endif %}{% if t.documento %} · nota {{ t.documento }}{% endif %} · lançamento nº {{ t.id }}</p>
+  <p class="suave">Voltando para o início em alguns segundos…</p>
+  <div class="acoes"><a class="botao" href="/">VOLTAR AO INÍCIO</a>
+    <a class="botao claro" href="/caixa/recibo/{{ t.id }}">🧾 IMPRIMIR RECIBO</a></div>
+</section>
+{% endblock %}

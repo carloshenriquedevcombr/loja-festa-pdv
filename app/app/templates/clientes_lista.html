@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block titulo %}Clientes{% endblock %}
+{% block conteudo %}
+<section class="cartao">
+  <form method="get" action="/clientes" role="search">
+    <label for="q">Nome ou telefone <span class="dica">Ex.: Maria · ou 99999</span></label>
+    <input id="q" name="q" type="search" value="{{ q }}" autofocus autocomplete="off">
+    <div class="acoes"><button type="submit" class="botao">⌕ PROCURAR</button>
+      {% if pode("clientes.editar") %}<a class="botao claro" href="/clientes/nova">✚ Cadastrar cliente</a>{% endif %}</div>
+  </form>
+</section>
+
+<div class="lista">
+{% for c in clientes %}
+  <a class="item" href="/clientes/{{ c.id }}">
+    <span class="principal"><span class="titulo-item">{{ c.nome }}</span><br>
+      <span class="suave">{{ c.telefone|telefone if c.telefone else "sem telefone" }}</span></span>
+    <span class="selo neutro">{{ c.pedidos }} pedido{{ "s" if c.pedidos != 1 }}</span>
+    {% if c.em_aberto > 0 %}<span class="selo alerta">Falta pagar {{ c.em_aberto|brl }}</span>{% endif %}
+  </a>
+{% else %}
+  <div class="cartao"><p>{{ "Nenhuma cliente encontrada." if q else "Nenhuma cliente cadastrada ainda." }}</p></div>
+{% endfor %}
+</div>
+{% endblock %}

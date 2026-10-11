@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% import "_icones.html" as ic %}
+{% block titulo %}Reimprimir{% endblock %}
+{% block conteudo %}
+<section class="cartao">
+  <p>Imprima de novo qualquer papel da loja: comprovante, contrato, checklist, etiqueta da peça, carnê, recibos e ficha de medidas.</p>
+  <form method="get" action="/reimprimir" class="linha-busca" role="search">
+    <label for="q-reimp" class="sr">Procurar</label>
+    <input id="q-reimp" name="q" type="search" value="{{ q }}" placeholder="Nome, telefone, CPF, código do comprovante ou da peça" autofocus>
+    <button type="submit" class="botao">{{ ic.icone("lupa", "ic-botao") }} Procurar</button>
+  </form>
+  {% if not q %}<p class="suave">Sem procurar, aparecem os últimos pedidos.</p>{% endif %}
+</section>
+
+{% if q and not pedidos and not clientes %}<p class="aviso">Nada encontrado para “{{ q }}”.</p>{% endif %}
+
+{% for p in pedidos %}
+<section class="cartao reimp-pedido">
+  <h2><span class="sku">{{ p.sku }}</span> {{ p.peca }} <small class="suave">· {{ p.cliente or "Venda no balcão" }} · {{ p.quando }} · {{ STATUS.get(p.status, p.status) }} · nº {{ p.codigo }}</small></h2>
+  <div class="reimp-grupos">
+    <div><p class="rotulo-grupo">Comprovante do pedido</p>
+      <div class="acoes compacta">
+        <a class="botao claro pequeno" href="/pedidos/{{ p.id }}/imprimir?formato=a4">📄 A4</a>
+        <a class="botao claro pequeno" href="/pedidos/{{ p.id }}/imprimir?formato=80">🧾 Térmica 80</a>
+        <a class="botao claro pequeno" href="/pedidos/{{ p.id }}/imprimir?formato=58">🧾 Térmica 58</a>
+        <a class="botao claro pequeno" href="/pedidos/{{ p.id }}/pdf?formato=a4">⬇ PDF</a>
+      </div></div>
+    <div><p class="rotulo-grupo">Contrato e checklist</p>
+      <div class="acoes compacta">
+        <a class="botao claro pequeno" href="/pedidos/{{ p.id }}/contrato">📜 Contrato{{ " (assinado)" if p.assinado }}</a>
+        <a class="botao claro pequeno" href="/pedidos/{{ p.id }}/checklist?formato=10x15">✅ Checklist 10×15</a>
+        <a class="botao claro pequeno" href="/pedidos/{{ p.id }}/checklist?formato=a4">✅ Checklist A4</a>
+      </div></div>
+    <div><p class="rotulo-grupo">Etiqueta da peça</p>
+      <div class="acoes compacta">
+        <a class="botao claro pequeno" href="/pecas/etiquetas/imprimir?ids={{ p.peca_id }}&amp;formato=pendurar">🏷 Pendurar</a>
+        <a class="botao claro pequeno" href="/pecas/etiquetas/imprimir?ids={{ p.peca_id }}&amp;formato=adesiva">🏷 Adesiva</a>
+      </div></div>
+    {% if p.carnes %}
+    <div><p class="rotulo-grupo">Carnê</p>
+      <div class="acoes compacta">
+        {% for c in p.carnes %}
+        <a class="botao claro pequeno" href="/crediario/{{ c.id }}/carne?formato=a4">📒 Carnê A4 ({{ c.parcelas }}x)</a>
+        <a class="botao claro pequeno" href="/crediario/{{ c.id }}/carne?formato=80">📒 Carnê térmica</a>
+        {% endfor %}
+      </div></div>
+    {% endif %}
+    {% if p.recibos %}
+    <div><p class="rotulo-grupo">Recibos dos pagamentos</p>
+      <div class="acoes compacta">
+        {% for t in p.recibos %}<a class="botao claro pequeno" href="/caixa/recibo/{{ t.id }}?formato=80">🧾 {{ t.quando }} · {{ "devolução " if t.tipo == "SAIDA" }}{{ t.valor_centavos|brl }}</a>{% endfor %}
+      </div></div>
+    {% endif %}
+    {% if p.cliente_id and pode("medidas.ver") %}
+    <div><p class="rotulo-grupo">Cliente</p>
+      <div class="acoes compacta"><a class="botao claro pequeno" href="/clientes/{{ p.cliente_id }}/medidas/imprimir">📏 Ficha de medidas</a></div></div>
+    {% endif %}
+  </div>
+</section>
+{% endfor %}
+
+{% if clientes %}
+<section class="cartao">
+  <h2>Clientes encontradas</h2>
+  <ul class="lista-simples">
+    {% for c in clientes %}<li><a href="/clientes/{{ c.id }}">{{ c.nome }}</a>
+      {% if c.tem_medidas and pode("medidas.ver") %} · <a href="/clientes/{{ c.id }}/medidas/imprimir">📏 imprimir ficha de medidas</a>{% endif %}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}Etiquetas{% endblock %}
+{% block voltar %}{{ voltar }}{% endblock %}
+{% block conteudo %}
+<section class="cartao nao-imprimir">
+  <p>{{ etiquetas|length }} etiqueta{{ "s" if etiquetas|length != 1 }}. Na impressora de etiquetas, escolha o papel do mesmo tamanho;
+     na folha A4, use papel de etiquetas 63,5 × 38,1 mm (21 por folha).</p>
+  <div class="acoes compacta">
+    <button type="button" class="botao" data-imprimir>🖨 IMPRIMIR</button>
+    {% for codigo, nome in FORMATOS.items() %}<a class="opcao {{ 'escolhida' if codigo == formato }}" href="?ids={{ ids }}&amp;formato={{ codigo }}&amp;copias={{ copias }}">{{ nome }}</a>{% endfor %}
+  </div>
+  <form method="get" action="/pecas/etiquetas/imprimir" class="linha-copias">
+    <input type="hidden" name="ids" value="{{ ids }}"><input type="hidden" name="formato" value="{{ formato }}">
+    <label for="copias">Cópias de cada</label><input id="copias" name="copias" type="number" min="1" max="21" value="{{ copias }}">
+    <button type="submit" class="botao claro pequeno">Atualizar</button>
+  </form>
+</section>
+<div class="etiquetas etiquetas-{{ formato }}">
+  {% for e in etiquetas %}
+  <div class="etq">
+    <div class="etq-topo">{% set mc = marca() %}{% if mc.logo %}<img src="/marca/{{ mc.logo }}-mono.png" alt="">{% else %}<span class="etq-loja">{{ usuario.loja }}</span>{% endif %}</div>
+    <div class="etq-sku">{{ e.sku }}</div>
+    <div class="etq-barras">{{ e.barras }}</div>
+    <div class="etq-meio">
+      <div class="etq-info"><strong>{{ e.nome }}</strong>{% if e.tamanho %}<br>Tam. <strong>{{ e.tamanho }}</strong>{% endif %}{% if e.cor %} · {{ e.cor }}{% endif %}
+        {% for nome, valor in e.precos %}<br>{{ nome }} {{ valor }}{% endfor %}</div>
+      <div class="etq-qr">{{ e.qr }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+<script src="{{ estatico('imprimir.js') }}" defer></script>
+{% endblock %}

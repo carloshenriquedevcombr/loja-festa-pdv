@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titulo %}Painel técnico{% endblock %}
+{% block conteudo %}
+<section class="painel-resumo">
+  <div class="numero vidro"><div class="rotulo-num">Peças</div><div class="valor-num">{{ numeros.pecas }}</div></div>
+  <div class="numero vidro"><div class="rotulo-num">Pedidos</div><div class="valor-num">{{ numeros.pedidos }}</div></div>
+  <div class="numero vidro"><div class="rotulo-num">Lançamentos</div><div class="valor-num">{{ numeros.lancamentos }}</div></div>
+  <div class="numero vidro"><div class="rotulo-num">Usuários ativos / bloqueados</div><div class="valor-num">{{ numeros.usuarios }} / {{ numeros.bloqueados }}</div></div>
+</section>
+<section class="cartao">
+  <p>Banco: <strong>{{ numeros.tamanho }}</strong> · {{ numeros.versao.split(" on ")[0] }}</p>
+  {% if not cookie_seguro %}<p class="aviso">Cookie sem HTTPS (ambiente local). Em produção deve estar ligado.</p>{% endif %}
+  <p class="suave">Backup: veja <code>docker compose exec backup cat /backups/ultimo_backup.json</code> na VPS.</p>
+  <h2>Últimos 40 eventos da auditoria</h2>
+  <div class="tabela-vidro"><table>
+    <thead><tr><th>Quando</th><th>O quê</th><th>Quem</th><th>IP</th></tr></thead>
+    {% for e in eventos %}<tr><td>{{ e.quando }}</td><td>{{ e.acao }}</td><td>{{ e.quem or "—" }}</td><td>{{ e.ip or "—" }}</td></tr>{% endfor %}
+  </table></div>
+</section>
+{% endblock %}

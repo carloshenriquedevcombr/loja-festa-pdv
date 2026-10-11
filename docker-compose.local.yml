@@ -1,0 +1,84 @@
+# Ambiente LOCAL para testar no seu PC (Docker Desktop). Não usar na VPS.
+# Diferenças da produção: sem Nginx Proxy Manager, sem backup agendado,
+# app em http://localhost (cookie sem HTTPS) e dados num volume separado.
+# Use pelo script:  .\local.ps1
+name: loja-local
+
+services:
+  db:
+    build:
+      context: .
+      dockerfile: db/Dockerfile
+    container_name: loja-local-db
+    environment:
+      POSTGRES_DB: loja
+      POSTGRES_USER: loja_owner
+      POSTGRES_PASSWORD: ${DB_OWNER_PASSWORD:?rode .\local.ps1 para gerar o .env.local}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?rode .\local.ps1 para gerar o .env.local}
+    volumes:
+      - db_local:/var/lib/postgresql/data
+    networks: [interna]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loja_owner -d loja"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  app:
+    build: ./app
+    container_name: loja-local-app
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      DATABASE_URL: postgresql://app_user:${APP_DB_PASSWORD}@db:5432/loja
+      SESSION_SECRET: ${SESSION_SECRET:?rode .\local.ps1 para gerar o .env.local}
+      LOJA_ID: ${LOJA_ID:-}
+      COOKIE_SECURE: "0"
+      FOTOS_DIR: /dados/fotos
+      DADOS_CHAVE: ${DADOS_CHAVE:?rode .\local.ps1 para gerar o .env.local}
+      SESSAO_OCIOSA_MIN: ${SESSAO_OCIOSA_MIN:-30}
+    volumes:
+      - fotos_local:/dados/fotos
+    ports:
+      # Só o seu PC acessa. ".\local.ps1 celular" troca para 0.0.0.0 (aparelhos do mesmo Wi-Fi).
+      - "${ENDERECO_LOCAL:-127.0.0.1}:${PORTA_LOCAL:-8000}:8000"
+    networks: [interna, web]
+
+  avisos:
+    # Fila de WhatsApp/e-mail e lembretes (só envia se o WhatsApp/e-mail estiver configurado no sistema)
+    build: ./app
+    container_name: loja-local-avisos
+    depends_on:
+      db: {condition: service_healthy}
+    command: ["python", "-m", "app.trabalhador"]
+    healthcheck: {disable: true}
+    environment:
+      DATABASE_URL: postgresql://app_user:${APP_DB_PASSWORD}@db:5432/loja
+      SESSION_SECRET: ${SESSION_SECRET}
+      LOJA_ID: ${LOJA_ID:-}
+      DADOS_CHAVE: ${DADOS_CHAVE}
+    networks: [interna, web]
+
+  testes:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile
+    profiles: [testes]
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      PGHOST: db
+      PGUSER: loja_owner
+      PGPASSWORD: ${DB_OWNER_PASSWORD}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      BACKUP_DIR: /tmp/backups
+    networks: [interna]
+
+networks:
+  interna:
+    internal: true
+  web: {}
+
+volumes:
+  db_local:
+  fotos_local:

@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf" content="{{ csrf }}">
+  <meta name="theme-color" content="#ffffff">
+  <title>{% block titulo %}{{ loja.nome }}{% endblock %}</title>
+  <meta name="description" content="{% block descricao %}{{ loja.frase_site or ('Aluguel e venda de roupas de festa · ' ~ loja.nome) }}{% endblock %}">
+  <meta property="og:title" content="{{ self.titulo() }}">
+  <meta property="og:site_name" content="{{ loja.nome }}">
+  {% block cabeca %}{% endblock %}
+  <link rel="preload" href="/static/fontes/cormorant.woff" as="font" type="font/woff" crossorigin>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icone-32.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="{{ estatico('site.css') }}">
+</head>
+{% import "_icones.html" as ic %}
+<body class="site" data-presenca="/site/presenca">
+<a class="pular" href="#conteudo">Pular para o conteúdo</a>
+<div class="faixa-topo">{{ loja.horario or "Aluguel e venda de roupas de festa" }}{% if whatsapp %} · <a href="{{ whatsapp }}" target="_blank" rel="noopener">Atendimento pelo WhatsApp</a>{% endif %}</div>
+
+<header class="cabecalho">
+  <div class="cabecalho-linha">
+    <input type="checkbox" id="abrir-menu" class="alternador" aria-label="Mostrar o menu">
+    <label for="abrir-menu" class="botao-menu" aria-label="Abrir o menu"><span></span><span></span><span></span></label>
+    {% set mc = marca() %}
+    <a class="marca" href="/site">{% if mc.logo %}<img class="marca-logo" src="/marca/{{ mc.logo }}-logo.png" alt="{{ loja.nome }}">{% else %}{{ loja.nome }}{% endif %}</a>
+    <div class="cabecalho-acoes">
+      <a class="link-icone" href="/site/colecao" aria-label="Ver todas as peças">Coleção</a>
+      <a class="link-icone conta" href="/site/conta">{{ ic.icone("pessoa") }}<span>{{ conta_site.nome.split()[0] if conta_site else "Entrar" }}</span></a>
+      {% if loja.sacola_ativa %}<a class="link-icone sacola" href="/site/sacola" aria-label="Sacola com {{ sacola_qtd or 0 }} peça(s)">{{ ic.icone("sacola") }}<span class="sacola-qtd">{{ sacola_qtd or 0 }}</span></a>{% endif %}
+      {% if whatsapp %}<a class="link-icone zap" href="{{ whatsapp }}" target="_blank" rel="noopener">WhatsApp</a>{% endif %}
+    </div>
+    <nav class="menu-celular" aria-label="Menu">
+      <ul>
+        {% for g in grupos %}
+        <li><a class="grupo" href="/site/c/{{ g.slug }}">{{ g.nome }}</a>
+          {% if g.filhos %}<ul>{% for o in g.filhos %}<li><a href="/site/c/{{ g.slug }}/{{ o.slug }}">{{ o.nome }}</a></li>{% endfor %}</ul>{% endif %}</li>
+        {% endfor %}
+        <li><a class="grupo" href="/site/colecao?publico=MASCULINO">Masculino</a></li>
+        <li><a class="grupo" href="/site/colecao?faixa=INFANTIL">Infantil</a></li>
+        <li><a class="grupo" href="/site/colecao">Ver tudo</a></li>
+        <li><a class="grupo destaque" href="/site/prova">Agendar prova</a></li>
+      </ul>
+    </nav>
+  </div>
+  <nav class="menu-principal" aria-label="Ocasiões">
+    <ul>
+      {% for g in grupos %}
+      <li class="{{ 'tem-sub' if g.filhos }}"><a href="/site/c/{{ g.slug }}">{{ g.nome }}</a>
+        {% if g.filhos %}<div class="submenu"><ul>{% for o in g.filhos %}<li><a href="/site/c/{{ g.slug }}/{{ o.slug }}">{{ o.nome }}</a></li>{% endfor %}</ul></div>{% endif %}
+      </li>
+      {% endfor %}
+      <li><a href="/site/colecao?publico=MASCULINO">Masculino</a></li>
+      <li><a href="/site/colecao?faixa=INFANTIL">Infantil</a></li>
+      <li class="destaque"><a href="/site/prova">Agendar prova</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main id="conteudo">{% block conteudo %}{% endblock %}</main>
+{% block antes_rodape %}{% include "site/_antes_rodape.html" %}{% endblock %}
+
+<footer class="rodape">
+  {% set mc = marca() %}
+  {% set lojas = unidades|default([]) %}
+  {% macro rede(ch, nome, url) %}<a class="{{ 'com-simbolo' if simbolos and simbolos.get(ch) }}" href="{{ url }}" target="_blank" rel="noopener" aria-label="{{ nome }}" title="{{ nome }}">{% if simbolos and simbolos.get(ch) %}<img src="/simbolo/{{ simbolos[ch] }}.png" alt="{{ nome }}">{% else %}{{ nome }}{% endif %}</a>{% endmacro %}
+  <div class="rodape-linha1">
+    <a class="rodape-marca" href="/site">{% if mc.logo %}<img src="/marca/{{ mc.logo }}-logo.png" alt="{{ loja.nome }}">{% else %}<span class="marca-rodape">{{ loja.nome }}</span>{% endif %}</a>
+    <div class="rodape-sobre">
+      <h2>Sobre a {{ loja.nome }}</h2>
+      <p>{{ loja.sobre_curto or loja.frase_site or "Roupas de festa para aluguel e venda." }}</p>
+    </div>
+    <div class="rodape-redes">
+      <h2>Siga a gente</h2>
+      <nav class="redes" aria-label="Redes sociais">
+        {% if loja.instagram %}{{ rede("instagram", "Instagram", "https://instagram.com/" ~ loja.instagram) }}{% endif %}
+        {% if loja.facebook %}{{ rede("facebook", "Facebook", loja.facebook) }}{% endif %}
+        {% if loja.tiktok %}{{ rede("tiktok", "TikTok", loja.tiktok) }}{% endif %}
+        {% if loja.youtube %}{{ rede("youtube", "YouTube", loja.youtube) }}{% endif %}
+        {% if loja.pinterest %}{{ rede("pinterest", "Pinterest", loja.pinterest) }}{% endif %}
+        {% if loja.site_externo %}<a href="{{ loja.site_externo }}" target="_blank" rel="noopener">{{ ic.icone("globo") }} Nosso outro site</a>{% endif %}
+        {% if whatsapp %}{{ rede("whatsapp", "WhatsApp", whatsapp) }}{% endif %}
+      </nav>
+    </div>
+    {% if loja.novidades_ativa %}
+    <form class="novidades" method="post" action="/site/novidades" id="form-novidades">
+      <h2 class="novidades-titulo">Receba nossas novidades</h2>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input class="isca" type="text" name="site" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <div class="novidades-campos">
+        <input name="nome" type="text" maxlength="80" placeholder="Nome" aria-label="Nome" autocomplete="name" required>
+        <input name="telefone" type="tel" maxlength="20" placeholder="WhatsApp" aria-label="WhatsApp" autocomplete="tel">
+        <input name="email" type="email" maxlength="120" placeholder="E-mail" aria-label="E-mail" autocomplete="email">
+        <button type="submit">Quero receber</button>
+      </div>
+      <label class="novidades-lgpd"><input type="checkbox" name="lgpd" value="1" required> Aceito receber novidades da {{ loja.nome }} (posso sair quando quiser).</label>
+      <p class="novidades-resposta" role="status" aria-live="polite"></p>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="rodape-linha2 {{ 'sem-loja' if not lojas }}">
+    {% if lojas %}
+    <div class="rodape-loja">
+      <h2>{{ "Nossas lojas" if lojas|length > 1 else "Nossa loja" }}</h2>
+      {% for u in lojas %}
+      <div class="loja-cartao">
+        <h3>{{ u.nome }}</h3>
+        <p>{{ u.endereco }}{% if u.cidade %} · {{ u.cidade }}{% endif %}</p>
+        {% if u.horario %}<p>{{ u.horario }}</p>{% endif %}
+        {% if u.telefone %}<p>Tel. {{ u.telefone|telefone }}</p>{% endif %}
+        {% if u.whatsapp %}<p><a href="https://wa.me/55{{ u.whatsapp }}" target="_blank" rel="noopener">WhatsApp {{ u.whatsapp|telefone }}</a></p>{% endif %}
+        <div class="mapa {{ 'mapa-auto' if loop.first }}" data-embed="{{ u.embed }}">
+          <button type="button" class="ver-mapa">Ver no mapa</button>
+          <a href="{{ u.mapa }}" target="_blank" rel="noopener">Como chegar (Google Maps)</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div>
+      <h2>Institucional</h2>
+      {% for slug, titulo in (PAGINAS.items()|list)[:4] %}<p><a href="/site/pagina/{{ slug }}">{{ titulo }}</a></p>{% endfor %}
+      <p><a href="/login">Área da equipe</a></p>
+    </div>
+    <div>
+      <h2>Ajuda</h2>
+      {% for slug, titulo in (PAGINAS.items()|list)[4:] %}<p><a href="/site/pagina/{{ slug }}">{{ titulo }}</a></p>{% endfor %}
+      <p><a href="/site/contrato">Verificar pedido ou contrato</a></p>
+    </div>
+    <div>
+      <h2>Entre em contato</h2>
+      {% if whatsapp %}<p><a href="{{ whatsapp }}" target="_blank" rel="noopener">WhatsApp {{ loja.whatsapp|telefone }}</a></p>{% endif %}
+      {% if loja.telefone %}<p>Telefone {{ loja.telefone }}</p>{% endif %}
+      {% if loja.email_contato %}<p><a href="mailto:{{ loja.email_contato }}">{{ loja.email_contato }}</a></p>{% endif %}
+      {% if loja.horario %}<p>{{ loja.horario }}</p>{% endif %}
+      <p><a href="/site/prova">Agendar prova</a></p>
+    </div>
+  </div>
+
+  <div class="rodape-pagamento">
+    {% if loja.formas_site or loja.bandeiras_site %}
+    <div>
+      <h2>Formas de pagamento</h2>
+      {% set genericos = {"dinheiro": "dinheiro", "cartao-de-debito": "cartao", "cartao-de-credito": "cartao", "link-de-pagamento": "link"} %}
+      <p class="selos">{% for f in loja.formas_site + loja.bandeiras_site %}{% set ch = chave_simbolo(f) %}
+        {% if simbolos and simbolos.get(ch) %}<span class="selo-simbolo" title="{{ f }}"><img src="/simbolo/{{ simbolos[ch] }}.png" alt="{{ f }}"></span>
+        {% elif genericos.get(ch) %}<span>{{ ic.icone(genericos[ch]) }} {{ f }}</span>
+        {% else %}<span>{{ f }}</span>{% endif %}{% endfor %}</p>
+    </div>
+    {% endif %}
+    <div>
+      <h2>Segurança</h2>
+      <p class="selos"><span>🔒 Site seguro (HTTPS)</span><span>Dados protegidos (LGPD)</span></p>
+    </div>
+  </div>
+  <p class="rodape-fim">© {{ loja.nome }} · <a href="/site/pagina/politica-de-privacidade">Privacidade</a> · <a href="/site/pagina/termos-de-uso">Termos</a> · Seus dados são usados só para o atendimento da loja.</p>
+</footer>
+<script src="{{ estatico('rodape.js') }}" defer></script>
+<script src="{{ estatico('presenca.js') }}" defer></script>
+<div class="chat-site" id="chat-site">
+  <input type="checkbox" id="abrir-chat" class="alternador" aria-label="Abrir o chat">
+  <label for="abrir-chat" class="chat-botao"><span aria-hidden="true">💬</span> Fale conosco</label>
+  <section class="chat-janela" aria-label="Chat com a loja">
+    <header><strong>{{ loja.nome }}</strong><span>Respondemos pelo nosso atendimento</span>
+      <label for="abrir-chat" class="chat-fechar" aria-label="Fechar o chat">✕</label></header>
+    <div class="chat-mensagens" aria-live="polite"></div>
+    <form method="post" action="/site/chat/enviar" class="chat-form" novalidate>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="chat-inicio">
+        <input name="nome" type="text" maxlength="60" placeholder="Seu nome" aria-label="Seu nome" autocomplete="name">
+        <input name="telefone" type="tel" placeholder="WhatsApp (opcional)" aria-label="WhatsApp (opcional)" autocomplete="tel">
+        <label class="chat-lgpd"><input type="checkbox" name="lgpd" value="1"> Concordo em ser atendida por aqui</label>
+      </div>
+      <div class="chat-linha">
+        <textarea name="texto" maxlength="1000" rows="2" placeholder="Escreva sua mensagem" aria-label="Mensagem" required></textarea>
+        <button type="submit" aria-label="Enviar">➤</button>
+      </div>
+      <p class="chat-erro" role="alert"></p>
+    </form>
+    <p class="chat-sem-js">Para conversar agora{% if whatsapp %}, <a href="{{ whatsapp }}" target="_blank" rel="noopener">chame no WhatsApp</a>{% else %}, ligue para a loja{% endif %}.</p>
+  </section>
+</div>
+<script src="{{ estatico('chat.js') }}" defer></script>
+</body>
+</html>

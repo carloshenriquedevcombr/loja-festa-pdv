@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block titulo %}Entrar{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito login">
+  {% set mc = marca() %}{% if mc.logo %}<img class="login-logo" src="/marca/{{ mc.logo }}-logo.png" alt="{{ mc.nome }}">{% endif %}
+  <h1>Entrar no sistema</h1>
+  {% if not configurada %}
+    <p class="aviso" role="alert">O sistema ainda não foi configurado. Chame o suporte.</p>
+  {% else %}
+    {% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+    {% if aviso %}<p class="aviso" role="status">{{ aviso }}</p>{% endif %}
+    <form method="post" action="/login" autocomplete="on">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label for="login">Seu usuário</label>
+      <input id="login" name="login" type="text" value="{{ login or '' }}" autocapitalize="none"
+             autocorrect="off" spellcheck="false" autocomplete="username" required autofocus>
+      <label for="senha">Sua senha</label>
+      <input id="senha" name="senha" type="password" autocomplete="current-password" required>
+      <div class="acoes"><button type="submit" class="botao">ENTRAR</button></div>
+    </form>
+    <p class="suave espaco">Clientes: <a href="/site">ir para o site da loja</a></p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block titulo %}{{ p.sku }}{% endblock %}
+{% block voltar %}/pecas{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {% if nova %}<p class="sucesso">Peça cadastrada! Agora coloque as fotos logo abaixo e imprima a etiqueta.</p>{% endif %}
+  <p class="enorme"><span class="sku">{{ p.sku }}</span></p>
+  <h2>{{ p.nome }}</h2>
+  <p>{{ p.categoria }}{% if p.tamanho %} · Tamanho <strong>{{ p.tamanho }}</strong>{% endif %}{% if p.cor %} · {{ p.cor }}{% endif %}<br>
+     <span class="suave">{{ PUBLICO[p.publico] }} · {{ FAIXA[p.faixa] }}{% if p.comprimento %} · {{ COMPRIMENTO[p.comprimento] }}{% endif %}</span></p>
+  {% if nomes_ocasioes %}<p class="suave">Ocasiões: {{ nomes_ocasioes }}</p>{% endif %}
+  <p>{% if p.no_site %}<span class="selo ok">No site{{ "" if p.preco_no_site else " · preço sob consulta" }}</span>
+     {% else %}<span class="selo neutro">Fora do site</span>{% endif %}</p>
+  <p>{% if p.pode_alugar %}Aluguel: <strong>{{ p.preco_aluguel_centavos|brl }}</strong><br>{% endif %}
+     {% if p.pode_vender %}Venda: <strong>{{ p.preco_venda_centavos|brl }}</strong>{% endif %}</p>
+  <p>Situação hoje: <span class="selo {{ 'ok' if p.situacao_hoje == 'DISPONIVEL' else 'info' }}">{{ SITUACAO[p.situacao_hoje] }}</span></p>
+  {% if p.descricao %}<p class="suave">{{ p.descricao }}</p>{% endif %}
+
+  <h3 id="fotos">Fotos ({{ fotos|length }} de {{ max_fotos }})</h3>
+  {% if fotos_ok and fotos_ok != "0" %}<p class="sucesso">{{ fotos_ok }} foto{{ "s" if fotos_ok != "1" }} guardada{{ "s" if fotos_ok != "1" }}!</p>{% endif %}
+  {% if erro_foto %}<p class="aviso" role="alert">{{ erro_foto }}</p>{% endif %}
+  {% if fotos %}
+  <div class="galeria-sistema">
+    {% for f in fotos %}
+      <figure>
+        <img src="/fotos/{{ f.arquivo }}-480.jpg" alt="Foto {{ loop.index }} de {{ p.nome }}" loading="lazy">
+        <figcaption>
+          {% if loop.first %}<span class="selo ok">Capa</span>{% endif %}
+          {% if pode("catalogo.editar") and p.status not in ("VENDIDO", "ARQUIVADO") %}
+          <span class="acoes compacta">
+            {% if not loop.first %}<form method="post" action="/pecas/{{ p.id }}/fotos/{{ f.id }}/capa">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" class="botao claro pequeno">★ Capa</button></form>{% endif %}
+            <form method="post" action="/pecas/{{ p.id }}/fotos/{{ f.id }}/tirar">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" class="botao claro pequeno">Tirar</button></form>
+          </span>
+          {% endif %}
+        </figcaption>
+      </figure>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if pode("catalogo.editar") and p.status not in ("VENDIDO", "ARQUIVADO") and fotos|length < max_fotos %}
+  <form method="post" action="/pecas/{{ p.id }}/fotos" enctype="multipart/form-data" class="enviar-fotos">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="arquivos_fotos">📷 1. Escolha as fotos (ou tire com a câmera do celular)</label>
+    <input id="arquivos_fotos" name="fotos" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+    <p class="dica">Dica: fundo liso, boa luz, peça inteira de frente, costas e um detalhe. A primeira foto é a capa no site.</p>
+    <button type="submit" class="botao cheio">✓ 2. ENVIAR AS FOTOS ESCOLHIDAS</button>
+  </form>
+  {% endif %}
+
+  {% if reservas %}
+    <h3>Pedidos desta peça</h3>
+    <div class="lista">
+      {% for r in reservas %}
+        <a class="item" {% if pode("pedidos.ver") %}href="/pedidos/{{ r.id }}"{% endif %}><span class="principal"><strong>{{ r.cliente or "Venda" }}</strong><br>
+          <span class="suave">Retirada {{ r.data_retirada|data }}{% if r.data_devolucao %} · devolução {{ r.data_devolucao|data }}{% endif %}</span></span></a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="acoes">
+    {% if pode("pedidos.criar") and p.situacao_hoje not in ("VENDIDO", "ARQUIVADO") %}
+      <a class="botao" href="/pedidos/novo?peca={{ p.id }}">✚ Fazer pedido com esta peça</a>{% endif %}
+    <a class="botao claro" href="/pecas/{{ p.id }}/etiqueta">🏷 Etiqueta</a>
+    {% if pode("catalogo.editar") and p.status not in ("VENDIDO", "ARQUIVADO") %}
+      <a class="botao claro" href="/pecas/{{ p.id }}/editar">✎ Editar</a>{% endif %}
+  </div>
+  {% if pode("catalogo.arquivar") and p.status not in ("VENDIDO", "ARQUIVADO") %}
+    <form method="post" action="/pecas/{{ p.id }}/arquivar" class="acoes">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="opcao"><input type="checkbox" name="confirmar" value="1">Esta peça saiu do acervo (vendida fora, perdida, descartada)</label>
+      <button type="submit" class="botao claro pequeno">Arquivar</button>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}

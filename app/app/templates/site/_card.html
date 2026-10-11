@@ -1,0 +1,20 @@
+{% macro card(p) %}
+<a class="card" href="/site/p/{{ p.slug }}">
+  <span class="card-foto">
+    {% if p.capa %}
+      <img src="/fotos/{{ p.capa }}-480.jpg" srcset="/fotos/{{ p.capa }}-480.jpg 480w, /fotos/{{ p.capa }}-960.jpg 960w"
+           sizes="(max-width: 700px) 50vw, 25vw" alt="{{ p.nome }}" loading="lazy">
+      {% if p.capa2 %}<img class="foto-2" src="/fotos/{{ p.capa2 }}-480.jpg" srcset="/fotos/{{ p.capa2 }}-480.jpg 480w, /fotos/{{ p.capa2 }}-960.jpg 960w"
+           sizes="(max-width: 700px) 50vw, 25vw" alt="" loading="lazy">{% endif %}
+    {% else %}
+      <span class="sem-foto">Foto em breve</span>
+    {% endif %}
+    {% if p.pode_alugar and p.pode_vender %}<span class="selo-card">Aluguel e venda</span>
+    {% elif p.pode_vender %}<span class="selo-card">Venda</span>
+    {% elif p.pode_alugar %}<span class="selo-card">Aluguel</span>{% endif %}
+  </span>
+  <span class="card-nome">{{ p.nome }}</span>
+  {% if p.tamanho %}<span class="card-info">Tamanho {{ p.tamanho }}</span>{% endif %}
+  <span class="card-preco">{{ p.preco_texto }}</span>
+</a>
+{% endmacro %}

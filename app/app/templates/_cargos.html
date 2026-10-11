@@ -1,0 +1,19 @@
+{# Marcação de cargos e vínculo (usada no cadastro e na ficha do funcionário) #}
+{% macro cargos(papeis, marcados, v) %}
+  <span class="rotulo">Cargos <span class="dica">Pode marcar mais de um. Ex.: Gerente faz costura e atendimento.</span></span>
+  <div class="opcoes largas">
+    {% for p in papeis %}
+      <label class="opcao"><input type="checkbox" name="papel_{{ p.codigo }}" value="1" {% if p.codigo in marcados %}checked{% endif %}>
+        {{ p.nome }}</label>
+    {% endfor %}
+  </div>
+  <span class="rotulo">Vínculo</span>
+  <div class="opcoes">
+    <label class="opcao"><input type="radio" name="vinculo" value="FIXO" {% if v.vinculo != "FREELANCE" %}checked{% endif %}>Fixo<small>acesso sem prazo</small></label>
+    <label class="opcao"><input type="radio" name="vinculo" value="FREELANCE" {% if v.vinculo == "FREELANCE" %}checked{% endif %}>Freelance<small>acesso até uma data</small></label>
+  </div>
+  <div class="se-freelance">
+    <label for="ate">Último dia de acesso</label>
+    <input id="ate" name="ate" type="date" value="{{ v.ate or '' }}">
+  </div>
+{% endmacro %}

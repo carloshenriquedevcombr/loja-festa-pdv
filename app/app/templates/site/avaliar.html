@@ -1,0 +1,31 @@
+{% extends "site/base.html" %}
+{% block titulo %}Avalie seu pedido · {{ loja.nome }}{% endblock %}
+{% block cabeca %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block antes_rodape %}{% endblock %}
+{% block conteudo %}
+<section class="pagina-estreita">
+  <h1 class="titulo-pagina">Como foi com a {{ loja.nome }}?</h1>
+  {% if p.ja_nota %}
+    <p class="centro">{% if obrigado %}Muito obrigada pela avaliação! 💐 Ela aparece no site depois que a loja conferir.{% else %}Você já avaliou este pedido. Obrigada! 💐{% endif %}</p>
+    <p class="centro"><a class="botao-site" href="/site">Voltar para o site</a></p>
+  {% else %}
+  <p class="centro suave">Pedido: {{ p.peca }}</p>
+  {% if erro %}<p class="aviso-site" role="alert">{{ erro }}</p>{% endif %}
+  <form method="post" action="/site/avaliar/{{ token }}" class="form-site">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <fieldset>
+      <legend class="centro">Sua nota</legend>
+      <div class="escolher-nota">
+        {% for n in [5, 4, 3, 2, 1] %}<input type="radio" id="nota{{ n }}" name="nota" value="{{ n }}" {% if v.nota == n|string %}checked{% endif %}><label for="nota{{ n }}" title="{{ n }} estrela{{ 's' if n > 1 }}">★<span class="sr">{{ n }} estrela{{ 's' if n > 1 }}</span></label>{% endfor %}
+      </div>
+    </fieldset>
+    <label for="texto">Conte como foi <span class="suave">(opcional)</span></label>
+    <textarea id="texto" name="texto" maxlength="600" rows="4">{{ v.texto or '' }}</textarea>
+    <label for="nome">Seu nome no site</label>
+    <input id="nome" name="nome" type="text" maxlength="40" value="{{ v.nome or '' }}">
+    <label class="concordo"><input type="checkbox" name="autoriza" value="1" checked> Autorizo mostrar minha avaliação no site com esse nome.</label>
+    <button type="submit" class="botao-site">Enviar avaliação</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

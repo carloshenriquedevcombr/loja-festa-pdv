@@ -1,0 +1,38 @@
+{% extends "site/base.html" %}
+{% block titulo %}Pagamento · {{ loja.nome }}{% endblock %}
+{% block conteudo %}
+<div class="pagina-estreita centro">
+  {% if situacao == "pix" %}
+    <p class="sobretitulo">Pagamento pelo Pix</p>
+    <h1 class="titulo-pagina">{{ link.valor_centavos|brl }}</h1>
+    <p>Referente à peça {{ link.sku }}{% if link.peca %} · {{ link.peca }}{% endif %}.</p>
+    <div class="pix-qr">{{ qr }}</div>
+    <p>Abra o app do seu banco, escolha <strong>Pix → Ler QR Code</strong> ou <strong>Pix Copia e Cola</strong> e cole o código abaixo.</p>
+    <label for="pix-copia" class="sr">Código Pix copia e cola</label>
+    <textarea id="pix-copia" class="pix-copia" rows="4" readonly>{{ link.pix_copia_cola }}</textarea>
+    <p><button type="button" class="botao-site" data-copiar="#pix-copia">Copiar código Pix</button></p>
+    <p class="suave">Depois de pagar, mande o comprovante no WhatsApp da loja. A loja confirma quando o Pix cair.</p>
+  {% elif situacao == "compra_paga" %}
+    <p class="sobretitulo">Obrigada!</p>
+    <h1 class="titulo-pagina">Compra confirmada</h1>
+    <p>Seu pedido já está na loja. Acompanhe tudo em <a href="/site/conta">Minha conta</a> e pelo WhatsApp.</p>
+  {% elif situacao in ("pago", "aprovado") %}
+    <p class="sobretitulo">Obrigada!</p>
+    <h1 class="titulo-pagina">Pagamento recebido</h1>
+    <p>A loja já foi avisada. Guarde o comprovante do Mercado Pago.{% if conta_site %} Seus pedidos ficam em <a href="/site/conta">Minha conta</a>.{% endif %}</p>
+  {% elif situacao == "pendente" %}
+    <h1 class="titulo-pagina">Pagamento em análise</h1>
+    <p>Assim que o Mercado Pago aprovar, a loja é avisada sozinha.</p>
+  {% elif situacao == "vencido" %}
+    <h1 class="titulo-pagina">Este link venceu</h1>
+    <p>Peça um link novo para a loja.</p>
+  {% elif situacao == "inexistente" %}
+    <h1 class="titulo-pagina">Link não encontrado</h1>
+    <p>Confira se copiou o link inteiro ou fale com a loja.</p>
+  {% else %}
+    <h1 class="titulo-pagina">O pagamento não foi concluído</h1>
+    <p>Nada foi cobrado. Você pode tentar de novo pelo mesmo link ou falar com a loja.</p>
+  {% endif %}
+  {% if whatsapp %}<p><a class="botao-site" href="{{ whatsapp }}" target="_blank" rel="noopener">Falar com a loja no WhatsApp</a></p>{% endif %}
+</div>
+{% endblock %}

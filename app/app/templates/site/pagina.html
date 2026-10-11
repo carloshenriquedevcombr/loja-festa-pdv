@@ -1,0 +1,8 @@
+{% extends "site/base.html" %}
+{% block titulo %}{{ titulo_pagina }} · {{ loja.nome }}{% endblock %}
+{% block conteudo %}
+<article class="pagina-texto">
+  <h1>{{ titulo_pagina }}</h1>
+  <div>{{ texto }}</div>
+</article>
+{% endblock %}

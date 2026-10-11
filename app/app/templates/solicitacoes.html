@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block titulo %}Pedidos de prova do site{% endblock %}
+{% block conteudo %}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+<section class="cartao">
+  <h2>Novos ({{ novas|length }})</h2>
+  <p class="suave">1) Chame a cliente no WhatsApp e combine o horário. 2) Marque aqui: ela vira cliente e a prova entra na Agenda.</p>
+  <div class="lista">
+  {% for s in novas %}
+    <div class="item solicitacao">
+      {% if s.capa %}<img class="miniatura" src="/fotos/{{ s.capa }}-480.jpg" alt="">{% else %}<span class="miniatura sem-foto" aria-hidden="true">sem peça</span>{% endif %}
+      <span class="principal"><span class="titulo-item">{{ s.nome }}</span> · {{ s.telefone|telefone }}<br>
+        <span class="suave">Quer vir em {{ s.data_desejada|data }} de {{ PERIODO[s.periodo] }}{% if s.data_evento %} · evento {{ s.data_evento|data }}{% endif %}
+          · chegou {{ s.chegou }}</span>
+        {% if s.sku %}<br><span class="sku">{{ s.sku }}</span> {{ s.peca }}{% endif %}
+        {% if s.mensagem %}<br><em>“{{ s.mensagem }}”</em>{% endif %}</span>
+      <div class="acoes compacta">
+        <a class="botao entrada pequeno" href="{{ s.whatsapp }}" target="_blank" rel="noopener">💬 Chamar no WhatsApp</a>
+      </div>
+      <form method="post" action="/solicitacoes/{{ s.id }}" class="marcar-prova">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="agendar">
+        <div class="par">
+          <div><label for="dia{{ loop.index }}">Dia combinado</label><input id="dia{{ loop.index }}" name="dia" type="date" value="{{ s.data_desejada.isoformat() }}"></div>
+          <div><label for="hora{{ loop.index }}">Hora</label><input id="hora{{ loop.index }}" name="hora" type="time" value="{{ '10:00' if s.periodo == 'MANHA' else '15:00' }}"></div>
+        </div>
+        <div class="acoes compacta"><button type="submit" class="botao pequeno">✓ Marcar prova</button></div>
+      </form>
+      <form method="post" action="/solicitacoes/{{ s.id }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="recusar">
+        <button type="submit" class="botao claro pequeno">Arquivar (não vai vir)</button>
+      </form>
+    </div>
+  {% else %}
+    <p class="vazio">Nenhum pedido novo. Quando alguém pedir prova pelo site, aparece aqui e na tela inicial.</p>
+  {% endfor %}
+  </div>
+</section>
+{% if tratadas %}
+<section class="cartao">
+  <h2>Já atendidos</h2>
+  <div class="lista">
+  {% for s in tratadas %}
+    <div class="item"><span class="principal"><strong>{{ s.nome }}</strong> · {{ s.telefone|telefone }}<br>
+      <span class="suave">{% if s.status == "AGENDADA" %}Prova marcada para {{ s.quando }}{% else %}Arquivado{% endif %}{% if s.sku %} · {{ s.sku }}{% endif %}</span></span>
+      {% if s.cliente_id and pode("clientes.ver") %}<a class="botao claro pequeno" href="/clientes/{{ s.cliente_id }}">Ficha</a>{% endif %}
+    </div>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

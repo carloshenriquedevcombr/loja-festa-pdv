@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block titulo %}Busca: {{ q }}{% endblock %}
+{% block conteudo %}
+{% if not (pedidos or clientes or pecas) %}<div class="cartao"><p>Nada encontrado com “{{ q }}”. Tente o nome, o telefone, o CPF, o código da peça ou do comprovante.</p></div>{% endif %}
+{% if pedidos %}<h2>Pedidos</h2><div class="lista">
+  {% for p in pedidos %}<a class="item" href="/pedidos/{{ p.id }}"><span class="sku">{{ p.sku }}</span><span class="principal"><span class="titulo-item">{{ p.cliente or "Venda" }}</span><br><span class="suave">{{ p.peca }}</span></span><span class="selo info">{{ STATUS.get(p.status, p.status) }}</span></a>{% endfor %}
+</div>{% endif %}
+{% if clientes %}<h2>Clientes</h2><div class="lista">
+  {% for c in clientes %}<a class="item" href="/clientes/{{ c.id }}"><span class="principal"><span class="titulo-item">{{ c.nome }}</span></span></a>{% endfor %}
+</div>{% endif %}
+{% if pecas %}<h2>Peças</h2><div class="lista">
+  {% for p in pecas %}<a class="item" href="/pecas/{{ p.id }}"><span class="sku">{{ p.sku }}</span><span class="principal"><span class="titulo-item">{{ p.nome }}</span></span></a>{% endfor %}
+</div>{% endif %}
+{% endblock %}

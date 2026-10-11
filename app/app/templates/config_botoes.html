@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block titulo %}Botões de cada cargo{% endblock %}
+{% block conteudo %}
+<section class="cartao">
+  {% if ok %}<p class="sucesso" role="status">Guardado. Cada pessoa vê a tela nova quando voltar ao início.</p>{% endif %}
+  <p>Desmarque o que cada cargo <strong>não precisa ver</strong> na tela inicial. Deixa a tela mais simples para quem usa pouco.</p>
+  <p class="suave">Esconder o botão não tira o acesso: para proibir, mude o cargo da pessoa em <a href="/equipe">Equipe</a>.
+    Quem tem mais de um cargo vê o botão se algum dos cargos mostrar. A Dona e o Desenvolvedor sempre veem tudo.</p>
+  <form method="post" action="/config/botoes">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="tabela-rolar">
+    <table class="tabela-botoes">
+      <thead><tr><th scope="col">Botão</th>{% for c in cargos %}<th scope="col">{{ c.nome.replace("Diretoria: ", "") }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for l in linhas %}
+        <tr><th scope="row"><span aria-hidden="true">{{ l.icone }}</span> {{ l.rotulo }}</th>
+          {% for c in l.cargos %}<td>{% if c.tem %}<label class="marcar"><input type="checkbox" name="v:{{ c.codigo }}:{{ l.end }}" value="1" {% if not c.oculto %}checked{% endif %}><span class="sr">Mostrar {{ l.rotulo }} para {{ c.codigo }}</span></label>{% else %}<span class="suave" title="O cargo não tem acesso">—</span>{% endif %}</td>{% endfor %}</tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <div class="acoes"><button type="submit" class="botao">✓ GUARDAR</button></div>
+  </form>
+</section>
+{% endblock %}

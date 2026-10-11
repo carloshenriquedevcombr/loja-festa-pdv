@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% import "_formulario.html" as f %}
+{% block titulo %}Confira antes de guardar{% endblock %}
+{% block voltar %}{{ url_corrigir }}{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  <p class="frase">
+    {% if modo == "pagar" %}
+      Você <strong>pagou {{ pag.frase() }}</strong><br>por: <strong>{{ descricao }}</strong>.
+      {% if det and det.fornecedor %}<br>Para: <strong>{{ det.fornecedor }}</strong>{% endif %}
+      {% if det and det.categoria %}<br>Tipo: {{ det.categoria }}{% endif %}
+      {% if det and det.documento %}<br>Nota/recibo nº {{ det.documento }}{% endif %}
+      {% if det and det.anexo %}<br><span class="nota-anexada">✓ Foto da nota anexada</span>{% endif %}
+    {% elif modo == "pedido" and pag.forma == "CREDIARIO" %}
+      Você vai <strong>liberar crediário de {{ pag.frase() }}</strong><br>para o pedido <span class="sku">{{ pe.sku }}</span>{% if pe.cliente %} de <strong>{{ pe.cliente }}</strong>{% endif %}.<br>
+      O carnê sai na próxima tela para imprimir e entregar à cliente.
+    {% elif modo == "pedido" %}
+      Você <strong>recebeu {{ pag.frase() }}</strong><br>do pedido <span class="sku">{{ pe.sku }}</span>{% if pe.cliente %} de <strong>{{ pe.cliente }}</strong>{% endif %}.<br>
+      {% if pe.saldo - pag.valor > 0 %}Depois disso ainda falta <strong>{{ (pe.saldo - pag.valor)|brl }}</strong>.
+      {% else %}Com isso o pedido fica <strong>quitado</strong>.{% endif %}
+    {% else %}
+      Você <strong>recebeu {{ pag.frase() }}</strong><br>referente a: <strong>{{ descricao }}</strong>.
+    {% endif %}
+  </p>
+  {% if pag.instrucao_maquininha() %}<p class="instrucao">💳 {{ pag.instrucao_maquininha() }}</p>{% endif %}
+  {% if pag.acrescimo %}<p class="suave">Inclui {{ pag.acrescimo|brl }} de acréscimo do parcelamento.</p>{% endif %}
+  <p class="grande">Está certo?</p>
+  <div class="acoes">
+    <form method="post" action="{{ url_gravar }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">{{ f.escondidos(campos) }}
+      <button type="submit" class="botao {{ m.cor }} cheio">✓ SIM, GUARDAR</button>
+    </form>
+    <form method="post" action="{{ url_corrigir }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">{{ f.escondidos(campos) }}
+      <button type="submit" class="botao claro cheio">✎ CORRIGIR</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

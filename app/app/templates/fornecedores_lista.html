@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block titulo %}Fornecedores{% endblock %}
+{% block conteudo %}
+<section class="cartao">
+  <form method="get" action="/fornecedores" role="search">
+    <label for="q">Nome ou CPF/CNPJ</label>
+    <input id="q" name="q" type="search" value="{{ q }}" autocomplete="off">
+    <div class="acoes"><button type="submit" class="botao">⌕ PROCURAR</button>
+      {% if pode("fornecedores.editar") %}<a class="botao claro" href="/fornecedores/novo">✚ Cadastrar fornecedor</a>{% endif %}
+      {% if pode("caixa.saida") %}<a class="botao saida" href="/caixa/pagar">Paguei algo</a>{% endif %}</div>
+  </form>
+</section>
+<div class="lista">
+{% for f in itens %}
+  <a class="item" href="/fornecedores/{{ f.id }}">
+    <span class="principal"><span class="titulo-item">🏷 {{ f.nome }}</span><br>
+      <span class="suave">{{ f.categoria or "Sem categoria" }}{% if f.telefone %} · {{ f.telefone|telefone }}{% endif %}{% if f.ultimo %} · último pagamento {{ f.ultimo }}{% endif %}</span></span>
+    {% if not f.ativo %}<span class="selo neutro">Inativo</span>{% endif %}
+    <span class="selo neutro">12 meses: {{ f.pago_12m|brl }}</span>
+  </a>
+{% else %}
+  <div class="cartao"><p>{{ "Nenhum fornecedor com esse nome." if q else "Nenhum fornecedor cadastrado ainda." }}</p></div>
+{% endfor %}
+</div>
+{% endblock %}

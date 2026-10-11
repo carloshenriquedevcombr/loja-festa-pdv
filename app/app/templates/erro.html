@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo or "Algo deu errado" }}{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  <h1>{{ titulo or "Algo deu errado" }}</h1>
+  <p>{{ mensagem or "Nada foi perdido. Volte para o início e tente de novo." }}</p>
+  <p class="suave">Código para o suporte: <strong>{{ request_id }}</strong></p>
+  <div class="acoes"><a class="botao" href="/">VOLTAR AO INÍCIO</a></div>
+</section>
+{% endblock %}

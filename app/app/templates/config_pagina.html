@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo_pagina }}{% endblock %}
+{% block voltar %}/config/rodape{% endblock %}
+{% block conteudo %}
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+<section class="cartao">
+  <p class="suave">Esta página aparece no rodapé do site. Escreva com frases curtas; linhas em branco separam os parágrafos.
+     Cada versão salva fica guardada (quem mudou e quando).{% if slug in ("politica-de-privacidade", "termos-de-uso", "trocas-e-devolucoes") %}
+     <strong>Peça para um advogado revisar este texto.</strong>{% endif %}</p>
+  <form method="post" action="/config/paginas/{{ slug }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="texto">Texto</label>
+    <textarea id="texto" name="texto" rows="18" maxlength="20000" class="texto-longo">{{ texto }}</textarea>
+    <div class="acoes"><button type="submit" class="botao">✓ SALVAR PÁGINA</button></div>
+  </form>
+  <form method="post" action="/config/paginas/{{ slug }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="padrao" value="1">
+    <button type="submit" class="botao claro pequeno">Voltar ao texto padrão</button>
+  </form>
+  <p><a href="/site/pagina/{{ slug }}" target="_blank" rel="noopener">Ver no site →</a></p>
+</section>
+{% endblock %}

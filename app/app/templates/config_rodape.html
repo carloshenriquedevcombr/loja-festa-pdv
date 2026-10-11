@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block titulo %}Rodapé do site{% endblock %}
+{% block voltar %}/config/site{% endblock %}
+{% block conteudo %}
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+
+<section class="cartao" id="unidades">
+  <h2>Lojas e endereços</h2>
+  <p class="suave">Cada loja aparece no rodapé do site com endereço, telefone, horário, botão "Ver no mapa" e "Como chegar".
+     O mapa só carrega quando a cliente toca (o site fica mais rápido).</p>
+  <div class="lista">
+  {% for u in unidades %}
+    <details class="item-editavel {{ '' if u.ativa else 'desligada' }}">
+      <summary><strong>{{ u.nome }}</strong>{% if u.principal %} <span class="selo ok">Principal</span>{% endif %}{% if not u.ativa %} <span class="selo neutro">Fora do site</span>{% endif %}
+        <br><span class="suave">{{ u.endereco }}{% if u.cidade %} · {{ u.cidade }}{% endif %}</span></summary>
+      <form method="post" action="/config/unidades/{{ u.id }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="salvar">
+        {% set v = u %}{% set pre = "u" ~ loop.index %}{% include "_unidade_campos.html" %}
+        <div class="acoes"><button type="submit" class="botao">✓ SALVAR</button></div>
+      </form>
+      <div class="acoes compacta">
+        {% if not u.principal and u.ativa %}<form method="post" action="/config/unidades/{{ u.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="principal"><button class="botao claro pequeno">★ Tornar principal</button></form>{% endif %}
+        <form method="post" action="/config/unidades/{{ u.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="{{ 'desativar' if u.ativa else 'ativar' }}"><button class="botao claro pequeno">{{ "Tirar do site" if u.ativa else "Voltar para o site" }}</button></form>
+        <a class="botao claro pequeno" href="{{ u.mapa }}" target="_blank" rel="noopener">Conferir no Google Maps</a>
+      </div>
+    </details>
+  {% else %}
+    <p class="suave">Nenhuma loja cadastrada ainda.</p>
+  {% endfor %}
+  </div>
+  <h3>Cadastrar loja/endereço</h3>
+  <form method="post" action="/config/unidades" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% set pre = "nova" %}{% include "_unidade_campos.html" %}
+    <div class="acoes"><button type="submit" class="botao">+ CADASTRAR LOJA</button></div>
+  </form>
+</section>
+
+<section class="cartao">
+  <h2>Textos, contato e pagamento</h2>
+  <form method="post" action="/config/rodape">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="sobre_curto">Sobre a loja (aparece no rodapé) <span class="dica">Ex.: Somos especialistas em vestidos de festa para madrinhas, formandas e convidadas.</span></label>
+    <textarea id="sobre_curto" name="sobre_curto" maxlength="400">{{ loja.sobre_curto or '' }}</textarea>
+    <label for="email_contato">E-mail de contato</label>
+    <input id="email_contato" name="email_contato" type="email" maxlength="120" value="{{ loja.email_contato or '' }}">
+    <span class="rotulo">Formas de pagamento mostradas</span>
+    <div class="opcoes">{% for f in FORMAS %}<label class="opcao"><input type="checkbox" name="formas" value="{{ f }}" {% if f in loja.formas_site %}checked{% endif %}>{{ f }}</label>{% endfor %}</div>
+    <span class="rotulo">Bandeiras de cartão aceitas</span>
+    <div class="opcoes">{% for b in BANDEIRAS %}<label class="opcao"><input type="checkbox" name="bandeiras" value="{{ b }}" {% if b in loja.bandeiras_site %}checked{% endif %}>{{ b }}</label>{% endfor %}</div>
+    <div class="opcoes largas">
+      <label class="opcao"><input type="checkbox" name="parcelas_no_site" value="1" {% if loja.parcelas_no_site %}checked{% endif %}>Mostrar o parcelamento na página da peça<small>Usa o modelo de parcelas das Configurações</small></label>
+      <label class="opcao"><input type="checkbox" name="novidades_ativa" value="1" {% if loja.novidades_ativa %}checked{% endif %}>"Receba nossas novidades" no rodapé<small>{{ inscritos }} pessoa{{ "s" if inscritos != 1 }} cadastrada{{ "s" if inscritos != 1 }} (dados cifrados, com autorização)</small></label>
+    </div>
+    <div class="acoes"><button type="submit" class="botao">✓ SALVAR</button></div>
+  </form>
+</section>
+
+<section class="cartao" id="paginas">
+  <h2>Páginas do rodapé e da ajuda</h2>
+  <p class="suave">Já vêm com um texto pronto; ajuste com as regras da sua loja.</p>
+  <div class="acoes compacta">
+    {% for slug, titulo in PAGINAS.items() %}<a class="botao claro" href="/config/paginas/{{ slug }}">{{ titulo }}{% if editadas.get(slug) %} <small>(editada {{ editadas[slug] }})</small>{% endif %}</a>{% endfor %}
+  </div>
+  <p class="suave">Redes sociais: botão <a href="/config/redes">Redes sociais</a>. Logo: <a href="/config/marca">Logo e marca</a>.
+    Símbolos oficiais das redes e dos cartões no rodapé: <a href="/config/simbolos">Símbolos das redes e cartões</a>.</p>
+</section>
+{% endblock %}

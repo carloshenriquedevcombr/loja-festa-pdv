@@ -1,0 +1,13 @@
+# Avisa (pull request) quando sair correção de segurança nas dependências, nas imagens Docker e nas Actions.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /app
+    schedule: {interval: weekly}
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directories: [/app, /db, /backup, /tests]
+    schedule: {interval: weekly}
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly}

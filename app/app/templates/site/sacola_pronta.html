@@ -1,0 +1,19 @@
+{% extends "site/base.html" %}
+{% block titulo %}Pagamento · {{ loja.nome }}{% endblock %}
+{% block cabeca %}<meta name="robots" content="noindex, nofollow">{% if c.status == "ABERTA" %}<meta http-equiv="refresh" content="3;url=/site/sacola/pagar/{{ c.id }}">{% endif %}{% endblock %}
+{% block antes_rodape %}{% endblock %}
+{% block conteudo %}
+<section class="pagina-estreita centro">
+  {% if c.status == "ABERTA" %}
+  <p class="sobretitulo">Quase lá</p>
+  <h1 class="titulo-pagina">Suas peças estão separadas</h1>
+  <p>Total: <strong>{{ c.valor_total_centavos|brl }}</strong>{% if c.frete_centavos %} (com {{ c.frete_centavos|brl }} de entrega){% endif %}.
+     Pague até as <strong>{{ c.ate }}</strong> para garantir.</p>
+  <p><a class="botao-site" href="/site/sacola/pagar/{{ c.id }}">Ir para o pagamento (Mercado Pago)</a></p>
+  <p class="aviso-pagamento">Você vai para a página segura do Mercado Pago. A loja não vê nem guarda os dados do seu cartão.</p>
+  {% else %}
+  <h1 class="titulo-pagina">Compra {{ "paga ✓" if c.status == "PAGA" else "não está mais aberta" }}</h1>
+  <p><a href="/site/conta">Ver em Minha conta</a></p>
+  {% endif %}
+</section>
+{% endblock %}

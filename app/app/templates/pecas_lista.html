@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}{{ "Escolha a peça do pedido" if escolher else "Procurar roupa" }}{% endblock %}
+{% block conteudo %}
+<section class="cartao">
+  <form method="get" action="/pecas" role="search">
+    {% if escolher %}<input type="hidden" name="escolher" value="1">{% endif %}
+    {% if cliente %}<input type="hidden" name="cliente" value="{{ cliente }}">{% endif %}
+    <label for="q">Nome, cor, tamanho ou código <span class="dica">Ex.: vestido azul 40 · ou passe o leitor na etiqueta da peça ou no checklist do pedido</span></label>
+    <input id="q" name="q" type="search" value="{{ q }}" autofocus autocomplete="off">
+    <span class="rotulo">Mostrar</span>
+    <div class="opcoes">
+      {% for valor, nome in [("todas", "Todas"), ("alugar", "Para alugar"), ("vender", "Para vender")] %}
+        <label class="opcao"><input type="radio" name="filtro" value="{{ valor }}" {% if filtro == valor %}checked{% endif %}>{{ nome }}</label>
+      {% endfor %}
+    </div>
+    <div class="acoes"><button type="submit" class="botao">⌕ PROCURAR</button>
+      {% if pode("catalogo.editar") and not escolher %}<a class="botao claro" href="/pecas/nova">✎ Cadastrar roupa nova</a>{% endif %}
+      {% if not escolher %}<a class="botao claro" href="/pecas/etiquetas">🏷 Imprimir etiquetas</a>{% endif %}</div>
+  </form>
+</section>
+
+<div class="lista">
+{% for p in pecas %}
+  <a class="item" href="{{ '/pedidos/novo?peca=' ~ p.id ~ ('&cliente=' ~ cliente if cliente else '') if escolher else '/pecas/' ~ p.id }}">
+    {% if p.capa %}<img class="miniatura" src="/fotos/{{ p.capa }}-480.jpg" alt="" loading="lazy">{% else %}<span class="miniatura sem-foto" aria-hidden="true">sem foto</span>{% endif %}
+    <span class="principal"><span class="sku">{{ p.sku }}</span><br><span class="titulo-item">{{ p.nome }}</span><br>
+      <span class="suave">{{ p.categoria }}{% if p.tamanho %} · Tam. {{ p.tamanho }}{% endif %}{% if p.cor %} · {{ p.cor }}{% endif %}</span></span>
+    <span>{% if p.pode_alugar %}Aluguel <strong>{{ p.preco_aluguel_centavos|brl }}</strong><br>{% endif %}
+          {% if p.pode_vender %}Venda <strong>{{ p.preco_venda_centavos|brl }}</strong>{% endif %}</span>
+    <span class="selo {{ 'ok' if p.situacao_hoje == 'DISPONIVEL' else 'info' }}">{{ SITUACAO[p.situacao_hoje] }}</span>
+    {% if escolher %}<span class="botao pequeno">Escolher →</span>{% endif %}
+  </a>
+{% else %}
+  <div class="cartao"><p>{{ "Nenhuma peça encontrada. Tente outra palavra." if q else "Nenhuma peça cadastrada ainda." }}</p></div>
+{% endfor %}
+</div>
+{% endblock %}

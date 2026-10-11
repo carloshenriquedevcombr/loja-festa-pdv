@@ -1,0 +1,14 @@
+{% set c = resumo.calendario %}
+<h2 id="t-cal" class="titulo-cal">{{ c.titulo }}</h2>
+<table class="mini-calendario" aria-label="Dias com compromissos em {{ c.titulo }}">
+  <thead><tr>{% for d in ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"] %}<th scope="col">{{ d }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for semana in c.semanas %}<tr>
+    {% for d in semana %}<td>
+      {% if d.month != c.mes %}<span class="dia fora">{{ d.day }}</span>
+      {% else %}<a class="{{ 'tem' if d in c.marcados }} {{ 'hoje' if d == c.hoje }}" href="/agenda?dia={{ d.isoformat() }}" aria-label="{{ d.day }}{{ ', com compromissos' if d in c.marcados }}{{ ', hoje' if d == c.hoje }}">{{ d.day }}</a>{% endif %}
+    </td>{% endfor %}
+  </tr>{% endfor %}
+  </tbody>
+</table>
+<p class="legenda-mini">Ponto dourado = dia com prova, retirada ou devolução.</p>

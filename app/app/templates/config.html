@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block titulo %}Configurações{% endblock %}
+{% block conteudo %}
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+<div class="acoes compacta espaco-baixo">{% if pode("site.editar", "config.pagamento") %}<a class="botao claro" href="/config/site">◈ Site, ocasiões e pagamento online →</a>{% endif %}
+  {% if pode("vitrine.regras") %}<a class="botao claro" href="/config/vitrine">☷ Regras da vitrine e reservas →</a>{% endif %}
+  {% if pode("whatsapp.config") %}<a class="botao claro" href="/config/whatsapp">✆ WhatsApp, e-mail e horário →</a>{% endif %}</div>
+<section class="cartao">
+  <h2>Maquininhas</h2>
+  <div class="lista">
+  {% for m in maquininhas %}
+    <div class="item">
+      <span class="bolinha cor-{{ m.cor_hex[1:]|upper }}"></span>
+      <span class="principal"><span class="titulo-item">{{ m.apelido }}</span><br>
+        <span class="suave">{{ "Operadora a definir" if m.operadora == "NAO_IDENTIFICADA" else m.operadora }} · taxas: a cadastrar</span></span>
+      <span class="selo {{ 'ok' if m.ativa else 'neutro' }}">{{ "Em uso" if m.ativa else "Desligada" }}</span>
+      {% if edita_maq %}
+      <form method="post" action="/config/maquininhas/{{ m.id }}/ativa">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ativa" value="{{ '0' if m.ativa else '1' }}">
+        <button type="submit" class="botao claro pequeno">{{ "Desligar" if m.ativa else "Voltar a usar" }}</button>
+      </form>
+      {% endif %}
+    </div>
+  {% endfor %}
+  </div>
+  {% if edita_maq %}
+  <h3>Cadastrar maquininha</h3>
+  <form method="post" action="/config/maquininhas">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="apelido">Apelido <span class="dica">Como a equipe chama: "Laranjinha Itaú", "Rede do balcão"</span></label>
+    <input id="apelido" name="apelido" type="text" maxlength="40">
+    <label for="operadora">Operadora</label>
+    <select id="operadora" name="operadora">{% for o in OPERADORAS %}<option>{{ o }}</option>{% endfor %}</select>
+    <span class="rotulo">Cor (para a atendente achar a maquininha certa)</span>
+    <div class="opcoes">
+      {% for hexa, nome in CORES.items() %}
+        <label class="opcao"><input type="radio" name="cor" value="{{ hexa }}" {% if loop.first %}checked{% endif %}>
+          <span><span class="bolinha cor-{{ hexa[1:] }}"></span>{{ nome }}</span></label>
+      {% endfor %}
+    </div>
+    <div class="acoes"><button type="submit" class="botao">+ CADASTRAR MAQUININHA</button></div>
+  </form>
+  {% endif %}
+</section>
+
+<section class="cartao">
+  <h2>Regras de pagamento</h2>
+  <p class="suave">Em vigor desde {{ autor.quando }}, definidas por {{ autor.nome }}. Mudar as regras não altera pedidos já feitos.</p>
+  <form method="post" action="/config/regras">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% set bloqueio = "" if edita_regras else "disabled" %}
+    <input type="hidden" name="regras_v2" value="1">
+    {% macro regra(chave, titulo, dica) %}
+      {% set tipo = cfg[chave ~ "_tipo"] %}{% set valor = cfg[chave ~ "_valor"] %}
+      <fieldset class="regra-valor">
+        <legend>{{ titulo }} <span class="dica">{{ dica }}</span></legend>
+        <div class="regra-linha">
+          <label class="opcao"><input type="radio" name="{{ chave }}_tipo" value="PCT" {% if tipo == "PCT" %}checked{% endif %} {{ bloqueio }}>% do total</label>
+          <label class="opcao"><input type="radio" name="{{ chave }}_tipo" value="FIXO" {% if tipo == "FIXO" %}checked{% endif %} {{ bloqueio }}>Valor fixo (R$)</label>
+          <input name="{{ chave }}_valor" type="text" inputmode="decimal" aria-label="{{ titulo }}"
+                 value="{{ (valor|int|campo) if tipo == 'FIXO' else (valor|pct) }}" {{ bloqueio }}>
+        </div>
+      </fieldset>
+    {% endmacro %}
+    <h3>Entrada para reservar</h3>
+    {{ regra("entrada_aluguel", "Aluguel", "Ex.: 30% do total, ou R$ 150,00 fixo") }}
+    {{ regra("entrada_venda", "Venda com ajuste", "Venda sem ajuste é sempre paga na hora") }}
+    <h3>Cancelamento pela cliente (a loja fica com)</h3>
+    {{ regra("multa_aluguel", "Aluguel", "Nunca passa do que ela já pagou; o resto é devolvido") }}
+    {{ regra("multa_venda", "Venda com ajuste", "Idem") }}
+    <label class="opcao"><input type="checkbox" name="arrependimento_7d" value="1" {% if cfg.arrependimento_7d %}checked{% endif %} {{ bloqueio }}>
+      Pedido feito fora da loja (link, WhatsApp, site) e cancelado em até 7 dias: devolver tudo
+      <small>Direito de arrependimento do Código de Defesa do Consumidor (art. 49). Recomendado deixar ligado.</small></label>
+    <h3>Parcelas e limites</h3>
+    <label for="parc_aluguel">Parcelar aluguel em até (vezes)</label>
+    <input id="parc_aluguel" name="parc_aluguel" type="text" inputmode="numeric" value="{{ cfg.max_parcelas_aluguel }}" {{ bloqueio }}>
+    <label for="parc_venda">Parcelar venda em até (vezes)</label>
+    <input id="parc_venda" name="parc_venda" type="text" inputmode="numeric" value="{{ cfg.max_parcelas_venda }}" {{ bloqueio }}>
+    <label for="parcela_min">Parcela mínima</label>
+    <input id="parcela_min" name="parcela_min" type="text" inputmode="decimal" value="{{ cfg.valor_minimo_parcela_centavos|campo }}" {{ bloqueio }}>
+    <label for="desconto">Desconto máximo (%)</label>
+    <input id="desconto" name="desconto" type="text" inputmode="decimal" value="{{ cfg.desconto_maximo_pct|round|int }}" {{ bloqueio }}>
+    <label for="teto_saida">Limite de saída de caixa da atendente</label>
+    <input id="teto_saida" name="teto_saida" type="text" inputmode="decimal" value="{{ cfg.teto_saida_atendente_centavos|campo }}" {{ bloqueio }}>
+    <label for="dias_limpeza">Dias de limpeza depois da devolução <span class="dica">A peça fica bloqueada para outro aluguel nesses dias</span></label>
+    <input id="dias_limpeza" name="dias_limpeza" type="text" inputmode="numeric" value="{{ cfg.dias_limpeza }}" {{ bloqueio }}>
+    <h3>Acréscimo cobrado da cliente no crédito parcelado (%)</h3>
+    <p class="suave">0 = sem juros. Para empatar com a taxa da maquininha: acréscimo = taxa ÷ (1 − taxa).</p>
+    <div class="opcoes">
+      {% for n in range(2, 13) %}
+        <label class="rotulo">{{ n }}x<input name="juros_{{ n }}" type="text" inputmode="decimal" value="{{ juros.get(n, 0)|round(2) }}" {{ bloqueio }}></label>
+      {% endfor %}
+    </div>
+    {% if edita_regras %}<div class="acoes"><button type="submit" class="botao">✓ SALVAR REGRAS</button></div>{% endif %}
+  </form>
+</section>
+<section class="cartao" id="parcelas">
+  <h2>Modelo de parcelas (balcão e site)</h2>
+  <p class="suave">É assim que o parcelamento aparece no site e no balcão, com as regras acima. Exemplo com uma peça de R$ 1.000,00:</p>
+  <div class="parcelas-grade">
+    {% for nome, s in (("Aluguel", exemplo.aluguel), ("Venda", exemplo.venda)) %}
+    <div>
+      <h3>{{ nome }}</h3>
+      <p>Reserva com <strong>{{ s.entrada|brl }}</strong> ({{ s.entrada_texto }}){% if s.sem_juros_ate > 1 %} · até <strong>{{ s.sem_juros_ate }}× sem juros</strong>{% endif %}</p>
+      <table class="tabela-parcelas">
+        <thead><tr><th>Vezes</th><th class="num">Parcela</th><th class="num">Total</th></tr></thead>
+        <tbody>{% for o in s.opcoes %}<tr><td>{{ o.vezes }}×{% if o.sem_juros and o.vezes > 1 %} <span class="selo ok">sem juros</span>{% endif %}</td>
+          <td class="num">{{ o.parcela|brl }}</td><td class="num">{{ o.total|brl }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+    {% endfor %}
+  </div>
+  {% if pode("site.editar") %}<p class="suave">Para mostrar ou esconder o parcelamento no site: <a href="/config/site#dados">Site e pagamento online</a>.</p>{% endif %}
+</section>
+{% if pode("contrato.editar") %}<section class="cartao"><h2>Contrato</h2><p class="suave">O texto do contrato que a cliente assina.</p>
+  <a class="botao claro" href="/config/contrato">✍ Editar o texto do contrato →</a></section>{% endif %}
+<section class="cartao">
+  <h2>Dados da loja nos comprovantes</h2>
+  <form method="post" action="/config/loja" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="loja_nome">Nome da loja</label>
+    <input id="loja_nome" name="nome" type="text" maxlength="80" value="{{ loja.nome }}" {% if not edita_regras %}disabled{% endif %}>
+    <label for="loja_cnpj">CNPJ <span class="dica">Opcional</span></label>
+    <input id="loja_cnpj" name="cnpj" type="text" inputmode="numeric" maxlength="18" value="{{ loja.cnpj or '' }}" {% if not edita_regras %}disabled{% endif %}>
+    <label for="loja_endereco">Endereço <span class="dica">Opcional</span></label>
+    <input id="loja_endereco" name="endereco" type="text" maxlength="160" value="{{ loja.endereco or '' }}" {% if not edita_regras %}disabled{% endif %}>
+    <label for="loja_telefone">Telefone / WhatsApp <span class="dica">Opcional</span></label>
+    <input id="loja_telefone" name="telefone" type="tel" maxlength="20" value="{{ loja.telefone or '' }}" {% if not edita_regras %}disabled{% endif %}>
+    <label for="loja_rodape">Recado no fim do comprovante <span class="dica">Opcional. Ex.: Trocas em até 7 dias. Obrigada pela preferência!</span></label>
+    <textarea id="loja_rodape" name="rodape" maxlength="300" {% if not edita_regras %}disabled{% endif %}>{{ loja.rodape_comprovante or '' }}</textarea>
+    {% if edita_regras %}<div class="acoes"><button type="submit" class="botao">✓ SALVAR DADOS DA LOJA</button></div>{% endif %}
+  </form>
+</section>
+{% endblock %}

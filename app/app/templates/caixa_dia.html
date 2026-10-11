@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block titulo %}Caixa do dia{% endblock %}
+{% block titulo_pagina %}Caixa de {{ dia|data }}{% if dia == hoje %} (hoje){% endif %}{% endblock %}
+{% block conteudo %}
+<section class="painel-resumo">
+  <div class="numero vidro"><div class="rotulo-num">Entrou</div><div class="valor-num">{{ tot.entrou|brl }}</div></div>
+  <div class="numero vidro"><div class="rotulo-num">Saiu</div><div class="valor-num">{{ tot.saiu|brl }}</div></div>
+  <div class="numero vidro"><div class="rotulo-num">Dinheiro que deve estar na gaveta</div><div class="valor-num">{{ tot.gaveta|brl }}</div></div>
+</section>
+<div class="acoes compacta nao-imprimir">
+  <a class="botao claro pequeno" href="/caixa?dia={{ anterior.isoformat() }}">← Dia anterior</a>
+  {% if dia != hoje %}<a class="botao claro pequeno" href="/caixa">Hoje</a>
+  <a class="botao claro pequeno" href="/caixa?dia={{ seguinte.isoformat() }}">Dia seguinte →</a>{% endif %}
+  <a class="botao claro pequeno" href="/caixa/extrato?de={{ dia.isoformat() }}&amp;ate={{ dia.isoformat() }}">🖨 Extrato (imprimir ou PDF)</a>
+</div>
+<div class="tabela-vidro">
+{% if lancamentos %}
+  <table>
+    <thead><tr><th>Hora</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th class="num">Valor</th><th>Quem</th><th></th></tr></thead>
+    <tbody>
+    {% for t in lancamentos %}
+      <tr class="{{ 'desfeito' if t.desfeito else '' }}">
+        <td>{{ t.hora }}</td>
+        <td>{% if t.estorno_de %}<span class="selo neutro">Desfaz nº {{ t.estorno_de }}</span>
+            {% elif t.tipo == "ENTRADA" %}<span class="selo ok">Entrada</span>{% else %}<span class="selo alerta">Saída</span>{% endif %}</td>
+        <td>{{ t.descricao }}{% if t.desfeito %} <strong>(desfeito)</strong>{% endif %}
+          {% if t.fornecedor or t.documento or t.anexo %}<br><span class="suave">{% if t.fornecedor %}{{ t.fornecedor }}{% endif %}{% if t.documento %} · nota {{ t.documento }}{% endif %}</span>{% if t.anexo %} <a href="/caixa/nota/{{ t.anexo }}" target="_blank" rel="noopener">📎 ver nota</a>{% endif %}{% endif %}</td>
+        <td>{{ FORMAS[t.forma_pagamento] }}{% if t.parcelas > 1 %} {{ t.parcelas }}x{% endif %}{% if t.maquininha %}<br><span class="suave">{{ t.maquininha }}</span>{% endif %}</td>
+        <td class="num">{{ ("- " if t.tipo == "SAIDA" else "") ~ (t.valor_centavos|brl) }}</td>
+        <td>{{ t.quem }}</td>
+        <td><a class="botao claro pequeno" href="/caixa/recibo/{{ t.id }}" title="Recibo nº {{ t.id }}">🧾 Recibo</a>
+            {% if pode("caixa.estornar") and not t.desfeito and not t.estorno_de %}
+              <a class="botao claro pequeno" href="/caixa/{{ t.id }}/desfazer">Desfazer</a>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="vazio">Nenhum lançamento neste dia.</p>
+{% endif %}
+</div>
+{% endblock %}

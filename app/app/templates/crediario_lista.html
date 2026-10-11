@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block titulo %}Crediário da loja{% endblock %}
+{% block conteudo %}
+{% if ok == "pix" %}<p class="sucesso" role="status">Pix do carnê guardado.</p>{% elif ok == "pix_invalido" %}<p class="aviso" role="alert">Chave Pix inválida. Use CPF/CNPJ só números, celular com +55, e-mail ou chave aleatória.</p>{% endif %}
+<section class="cartao">
+  <p class="suave">O crediário é liberado dentro do pedido: <strong>Receber → Crediário da loja (carnê)</strong>. Aqui você acompanha e recebe as parcelas.</p>
+  <form method="get" action="/crediario" role="search">
+    <label for="q">Cliente <span class="dica">Nome, telefone ou CPF</span></label>
+    <input id="q" name="q" type="search" value="{{ q }}" autocomplete="off">
+    <input type="hidden" name="ver" value="{{ ver }}">
+    <div class="acoes compacta"><button type="submit" class="botao">⌕ PROCURAR</button>
+      <a class="opcao {{ 'escolhida' if ver == 'abertos' }}" href="?ver=abertos&amp;q={{ q|urlencode }}">Em aberto</a>
+      <a class="opcao {{ 'escolhida' if ver == 'vencidos' }}" href="?ver=vencidos&amp;q={{ q|urlencode }}">Com parcela vencida</a>
+      <a class="opcao {{ 'escolhida' if ver == 'todos' }}" href="?ver=todos&amp;q={{ q|urlencode }}">Todos</a></div>
+  </form>
+  <p>A receber: <strong>{{ totais.falta|brl }}</strong>{% if totais.vencidas %} · <span class="vencida">{{ totais.vencidas }} parcela{{ "s" if totais.vencidas != 1 }} vencida{{ "s" if totais.vencidas != 1 }}</span>{% endif %}</p>
+</section>
+
+<div class="lista">
+{% for c in itens %}
+  <a class="item" href="/crediario/{{ c.id }}">
+    <span class="principal"><span class="titulo-item">📒 {{ c.cliente }}</span><br>
+      <span class="suave">{{ c.valor_centavos|brl }} em {{ c.parcelas }}x · {{ c.pagas }} paga{{ "s" if c.pagas != 1 }}{% if c.sku %} · <span class="sku">{{ c.sku }}</span>{% endif %}</span></span>
+    {% if c.status == "ATIVO" %}
+      {% if c.vencidas %}<span class="selo alerta">{{ c.vencidas }} vencida{{ "s" if c.vencidas != 1 }}</span>{% endif %}
+      <span class="selo neutro">Falta {{ c.falta|brl }}{% if c.proximo %} · próx. {{ c.proximo|data }}{% endif %}</span>
+    {% else %}<span class="selo neutro">{{ "Quitado" if c.status == "QUITADO" else "Cancelado" }}</span>{% endif %}
+  </a>
+{% else %}
+  <div class="cartao"><p>Nenhum crediário {{ "com esse nome" if q else "aqui" }}.</p></div>
+{% endfor %}
+</div>
+
+{% if pode("crediario.liberar") %}
+<section class="cartao estreito">
+  <h2>Pix que sai no carnê</h2>
+  <p class="suave">Cada folha do carnê leva um QR Code Pix com o valor da parcela. A cliente paga pelo app do banco e a loja dá baixa aqui quando o Pix cair.</p>
+  <form method="post" action="/crediario/pix">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="pix_chave">Chave Pix da loja <span class="dica">CPF/CNPJ só números, celular +5511999999999, e-mail ou chave aleatória</span></label>
+    <input id="pix_chave" name="pix_chave" type="text" maxlength="77" value="{{ loja_pix.pix_chave or '' }}" autocomplete="off">
+    <label for="pix_nome">Nome de quem recebe <span class="dica">Até 25 letras, como aparece no banco</span></label>
+    <input id="pix_nome" name="pix_nome" type="text" maxlength="25" value="{{ loja_pix.pix_nome or '' }}">
+    <label for="pix_cidade">Cidade <span class="dica">Até 15 letras</span></label>
+    <input id="pix_cidade" name="pix_cidade" type="text" maxlength="15" value="{{ loja_pix.pix_cidade or '' }}">
+    <div class="acoes"><button type="submit" class="botao">GUARDAR PIX</button></div>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

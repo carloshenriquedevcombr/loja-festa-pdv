@@ -1,0 +1,35 @@
+{% extends "site/base.html" %}
+{% block titulo %}Verificar pedido e contrato · {{ loja.nome }}{% endblock %}
+{% block conteudo %}
+<div class="pagina-estreita centro">
+  <h1 class="titulo-pagina">Verificar pedido e contrato</h1>
+  <form method="get" action="/site/contrato" class="form-site">
+    <label for="codigo">Código do contrato ou número do pedido (estão no comprovante)</label>
+    <input id="codigo" name="codigo" type="text" maxlength="20" value="{{ codigo }}" placeholder="ABCD-EFGH-JKLM ou 4BD6916B">
+    <button type="submit" class="botao-site largo espaco-site">Verificar</button>
+  </form>
+  {% if resultado is not none %}
+    {% if resultado %}
+      <div class="verificacao">
+        <p class="resposta-data livre">✓ Pedido nº {{ resultado.numero }} encontrado · {{ resultado.loja }}{% if conferido %} · conferido pelo QR code{% endif %}</p>
+        <dl class="verificacao-dados">
+          <div><dt>Peça</dt><dd>{{ resultado.sku }} – {{ resultado.peca }}</dd></div>
+          <div><dt>Tipo</dt><dd>{{ "Aluguel" if resultado.tipo == "ALUGUEL" else ("Venda com ajuste" if resultado.com_ajuste else "Venda") }}</dd></div>
+          <div><dt>Situação</dt><dd><strong>{{ STATUS.get(resultado.status, resultado.status) }}</strong>{% if resultado.quitado %} · pago{% endif %}</dd></div>
+          <div><dt>Feito em</dt><dd>{{ resultado.criado }}</dd></div>
+          {% if resultado.retirada %}<div><dt>Retirada</dt><dd>{{ resultado.retirada }}</dd></div>{% endif %}
+          {% if resultado.devolucao %}<div><dt>Devolução</dt><dd>{{ resultado.devolucao }}</dd></div>{% endif %}
+          <div><dt>Contrato</dt><dd>{% if resultado.contrato %}✓ assinado em {{ resultado.contrato.assinado }} · código {{ resultado.contrato.codigo }}<br><span class="suave">Impressão digital: {{ resultado.contrato.hash[:16] }}…</span>{% else %}ainda não assinado{% endif %}</dd></div>
+        </dl>
+        {% if resultado.historico %}
+        <h2 class="subtitulo-site">Histórico</h2>
+        <ol class="historico-site">{% for h in resultado.historico %}<li><span>{{ h.quando }}</span> {{ STATUS.get(h.para, h.para) }}</li>{% endfor %}</ol>
+        {% endif %}
+        <p class="suave">Por segurança, esta página não mostra nome, telefone nem valores. A cliente vê tudo no link que recebeu no WhatsApp.</p>
+      </div>
+    {% else %}
+      <p class="resposta-data ocupada">Não encontramos pedido nem contrato com esse código. Confira as letras e números.</p>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

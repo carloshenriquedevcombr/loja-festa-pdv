@@ -1,0 +1,57 @@
+{% extends "site/base.html" %}
+{% block titulo %}Entrar · {{ loja.nome }}{% endblock %}
+{% block cabeca %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block antes_rodape %}{% endblock %}
+{% block conteudo %}
+<section class="bloco">
+  <h1 class="titulo-pagina">Minha conta</h1>
+  {% if aviso %}<p class="aviso-site" role="alert">{{ aviso }}</p>{% endif %}
+  <div class="abas-conta">
+    {% if zap %}
+    <div class="caixa-site">
+      <h2>Entrar pelo WhatsApp</h2>
+      <p class="suave">Mandamos um código de 6 números para o seu WhatsApp. Sem senha para lembrar.</p>
+      {% if erro_zap %}<p class="aviso-site" role="alert">{{ erro_zap }}</p>{% endif %}
+      <form method="post" action="/site/conta/codigo/pedir" class="form-site" novalidate>
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="proximo" value="{{ proximo }}">
+        <label for="telefone">Seu WhatsApp com DDD</label>
+        <input id="telefone" name="telefone" type="tel" autocomplete="tel" inputmode="tel" value="{{ v.telefone or '' }}" placeholder="(19) 99999-9999">
+        <button type="submit" class="botao-site">Receber código</button>
+      </form>
+    </div>
+    {% endif %}
+    <div class="caixa-site">
+      <h2>Entrar com e-mail e senha</h2>
+      {% if erro_senha %}<p class="aviso-site" role="alert">{{ erro_senha }}</p>{% endif %}
+      <form method="post" action="/site/conta/entrar" class="form-site" novalidate>
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="proximo" value="{{ proximo }}">
+        <label for="email">E-mail</label>
+        <input id="email" name="email" type="email" autocomplete="username" value="{{ v.email or '' }}">
+        <label for="senha">Senha</label>
+        <input id="senha" name="senha" type="password" autocomplete="current-password">
+        <button type="submit" class="botao-site">Entrar</button>
+      </form>
+      <p class="suave">Esqueceu a senha? {% if zap %}Entre pelo WhatsApp e crie outra em Minha conta.{% else %}Fale com a loja.{% endif %}</p>
+    </div>
+    <div class="caixa-site caixa-cadastro" id="cadastro">
+      <h2>Primeira vez? Crie sua conta</h2>
+      <p class="suave">Acompanhe pedidos e contratos, e compre ou alugue pelo site.{% if zap %} Mandamos um código no WhatsApp para confirmar o número.{% endif %}</p>
+      <form method="post" action="/site/conta/criar" class="form-site" novalidate>
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="proximo" value="{{ proximo }}">
+        <label for="c-nome">Nome e sobrenome</label>
+        <input id="c-nome" name="nome" type="text" maxlength="120" autocomplete="name">
+        <label for="c-telefone">WhatsApp com DDD</label>
+        <input id="c-telefone" name="telefone" type="tel" autocomplete="tel" placeholder="(19) 99999-9999">
+        <label for="c-email">E-mail <span class="dica-site">{{ "(opcional)" if zap }}</span></label>
+        <input id="c-email" name="email" type="email" maxlength="120" autocomplete="email">
+        <label for="c-senha">Senha <span class="dica-site">{{ "(opcional) " if zap }}8 a 32, com maiúscula, minúscula, número e símbolo</span></label>
+        <input id="c-senha" name="senha" type="password" autocomplete="new-password" maxlength="32">
+        <label class="concordo"><input type="checkbox" name="lgpd" value="1">
+          Li e concordo com a <a href="/site/pagina/politica-de-privacidade" target="_blank" rel="noopener">Política de privacidade</a>.</label>
+        <button type="submit" class="botao-site">{{ "Continuar" if zap else "Criar conta" }}</button>
+      </form>
+    </div>
+  </div>
+  <p class="centro aviso-pagamento">🔒 A loja não guarda dados de cartão, Pix ou boleto: o pagamento é feito no Mercado Pago.</p>
+</section>
+{% endblock %}

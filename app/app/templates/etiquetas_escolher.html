@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block titulo %}Imprimir etiquetas{% endblock %}
+{% block voltar %}/pecas{% endblock %}
+{% block conteudo %}
+<section class="cartao">
+  <form method="get" action="/pecas/etiquetas">
+    <label for="q">Procurar peça (código ou nome)</label>
+    <input id="q" name="q" type="search" value="{{ q }}" autocomplete="off">
+    <div class="acoes"><button type="submit" class="botao claro">Procurar</button></div>
+  </form>
+</section>
+<section class="cartao">
+  <form method="get" action="/pecas/etiquetas/imprimir" id="form-etiquetas">
+    <p class="suave">Marque as peças (as mais novas aparecem primeiro) e escolha o formato.</p>
+    <input type="hidden" name="ids" id="ids-escolhidas" value="">
+    <div class="lista">
+      {% for p in pecas %}
+      <label class="opcao item-marcar"><input type="checkbox" class="marcar-peca" value="{{ p.id }}"><span class="sku">{{ p.sku }}</span> {{ p.nome }}{% if p.tamanho %} · tam. {{ p.tamanho }}{% endif %}</label>
+      {% else %}<p class="suave">Nenhuma peça encontrada.</p>{% endfor %}
+    </div>
+    <span class="rotulo">Formato</span>
+    <div class="opcoes">{% for codigo, nome in FORMATOS.items() %}<label class="opcao"><input type="radio" name="formato" value="{{ codigo }}" {% if loop.first %}checked{% endif %}>{{ nome }}</label>{% endfor %}</div>
+    <div class="acoes"><button type="submit" class="botao">🏷 GERAR ETIQUETAS</button></div>
+    <p class="aviso nao-js">Sem JavaScript: abra a peça e use "Etiqueta" nela.</p>
+  </form>
+</section>
+<script src="{{ estatico('etiquetas.js') }}" defer></script>
+{% endblock %}

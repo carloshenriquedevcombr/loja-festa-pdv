@@ -1,0 +1,38 @@
+{% extends "site/base.html" %}
+{% block titulo %}Agendar prova · {{ loja.nome }}{% endblock %}
+{% block conteudo %}
+<div class="pagina-estreita">
+  <h1 class="titulo-pagina">Agendar prova</h1>
+  <p class="centro suave">Conte quando você quer vir. A loja confirma o horário pelo WhatsApp.</p>
+  {% if p %}
+  <a class="peca-escolhida" href="/site/p/{{ p.slug }}">
+    {% if p.capa %}<img src="/fotos/{{ p.capa }}-480.jpg" alt="">{% endif %}
+    <span><span class="sku-site">Ref. {{ p.sku }}</span><br><strong>{{ p.nome }}</strong>{% if p.tamanho %}<br>Tamanho {{ p.tamanho }}{% endif %}</span>
+  </a>
+  {% endif %}
+  {% if erro %}<p class="aviso-site" role="alert">{{ erro }}</p>{% endif %}
+  <form method="post" action="/site/prova" class="form-site" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="peca" value="{{ v.peca or '' }}">
+    <div class="isca" aria-hidden="true"><label for="site">Não preencha</label><input id="site" name="site" type="text" tabindex="-1" autocomplete="off"></div>
+    <label for="nome">Seu nome</label>
+    <input id="nome" name="nome" type="text" maxlength="120" autocomplete="name" value="{{ v.nome or '' }}" required>
+    <label for="telefone">Seu WhatsApp</label>
+    <input id="telefone" name="telefone" type="tel" autocomplete="tel" placeholder="(19) 99999-9999" value="{{ v.telefone or '' }}" required>
+    <label for="data_evento">Data da festa <span class="dica-site">(se já souber)</span></label>
+    <input id="data_evento" name="data_evento" type="date" min="{{ hoje.isoformat() }}" value="{{ v.data_evento or '' }}">
+    <label for="data_desejada">Quando você quer vir provar?</label>
+    <input id="data_desejada" name="data_desejada" type="date" min="{{ hoje.isoformat() }}" value="{{ v.data_desejada or '' }}" required>
+    <fieldset class="periodo">
+      <legend>Período</legend>
+      <label><input type="radio" name="periodo" value="MANHA" {% if v.periodo == "MANHA" %}checked{% endif %}> Manhã</label>
+      <label><input type="radio" name="periodo" value="TARDE" {% if v.periodo != "MANHA" %}checked{% endif %}> Tarde</label>
+    </fieldset>
+    <label for="mensagem">Quer contar algo? <span class="dica-site">(opcional)</span></label>
+    <textarea id="mensagem" name="mensagem" maxlength="500" placeholder="Ex.: sou madrinha, casamento na praia, gosto de tons terrosos">{{ v.mensagem or '' }}</textarea>
+    <label class="concordo"><input type="checkbox" name="lgpd" value="1" {% if v.lgpd == "1" %}checked{% endif %}>
+      Concordo que a loja guarde estes dados e fale comigo pelo WhatsApp sobre a prova.</label>
+    <button type="submit" class="botao-site grande largo">Pedir horário</button>
+  </form>
+</div>
+{% endblock %}

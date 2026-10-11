@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% import "_formulario.html" as f %}
+{% block titulo %}Receber parcela {{ p.numero }} de {{ c.parcelas }}{% endblock %}
+{% block voltar %}/crediario/{{ c.id }}{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {{ f.erro_box(erro) }}
+  <p>📒 {{ c.cliente }}{% if c.sku %} · <span class="sku">{{ c.sku }}</span>{% endif %}</p>
+  {% if p.paga_em %}
+    <p class="grande">Esta parcela já está paga ✓</p>
+  {% else %}
+  <p class="grande">Parcela {{ p.numero }}/{{ c.parcelas }}: {{ p.valor_centavos|brl }}</p>
+  <p class="{{ 'vencida' if p.vencida else 'suave' }}">{{ "Venceu" if p.vencida else "Vence" }} em {{ p.vencimento|data }}</p>
+  <form method="post" action="/crediario/{{ c.id }}/parcela/{{ p.numero }}" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="chave" value="{{ v.chave }}">
+    {{ f.pagamento(v, formas, maquininhas, max_parcelas, "Como a cliente pagou?", modo=modo_pagamento) }}
+    <div class="acoes"><button type="submit" class="botao entrada">✓ RECEBI {{ p.valor_centavos|brl }}</button></div>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

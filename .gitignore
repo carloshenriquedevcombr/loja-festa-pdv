@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+*.dump
+backups/
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+dados-local/

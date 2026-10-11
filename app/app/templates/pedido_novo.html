@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% import "_formulario.html" as f %}
+{% block titulo %}Novo pedido{% endblock %}
+{% block voltar %}/pecas/{{ p.id }}{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {{ f.erro_box(erro) }}
+  <p><span class="sku">{{ p.sku }}</span> <strong>{{ p.nome }}</strong>{% if p.tamanho %} · Tam. {{ p.tamanho }}{% endif %}</p>
+  <h2>1. Cliente</h2>
+  {% if v.cliente_id %}
+    <p class="cliente-escolhida">👤 <strong>{{ v.cliente_nome }}</strong>{% if v.cliente_telefone %} · {{ v.cliente_telefone }}{% endif %}
+      <a href="/pedidos/novo?peca={{ p.id }}">trocar</a> · <a href="/clientes/{{ v.cliente_id }}" target="_blank" rel="noopener">ver ficha</a></p>
+  {% else %}
+  <form method="get" action="/pedidos/novo" class="busca-receber" role="search">
+    <input type="hidden" name="peca" value="{{ p.id }}">
+    <label for="busca_cliente" class="rotulo">Procurar cliente cadastrada</label>
+    <input id="busca_cliente" name="busca_cliente" type="search" maxlength="60" value="{{ busca_cliente }}" placeholder="Nome, telefone ou CPF">
+    <button type="submit" class="botao claro">🔍 PROCURAR</button>
+  </form>
+  {% if achadas is not none %}
+    {% if achadas %}<ul class="achados">{% for c in achadas %}
+      <li><a href="/pedidos/novo?peca={{ p.id }}&amp;cliente={{ c.id }}"><span>👤 {{ c.nome }}<br><small>{% if c.telefone_fim %}tel. final {{ c.telefone_fim }} · {% endif %}{{ c.pedidos }} pedido(s)</small></span><span class="valor-achado">escolher →</span></a></li>
+    {% endfor %}</ul>
+    {% else %}<p class="suave">Nenhuma cliente com “{{ busca_cliente }}”. Preencha abaixo como cliente nova.</p>{% endif %}
+  {% endif %}
+  {% endif %}
+  <form method="post" action="/pedidos/novo/conferir" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="chave" value="{{ v.chave }}">
+    <input type="hidden" name="peca" value="{{ p.id }}">
+    {% if v.cliente_id %}<input type="hidden" name="cliente_id" value="{{ v.cliente_id }}">{% endif %}
+
+    <span class="rotulo">O que a cliente quer?</span>
+    <div class="opcoes largas">
+      {% for codigo, preco in tipos.items() %}
+        <label class="opcao"><input type="radio" name="tipo" value="{{ codigo }}" {% if v.tipo == codigo %}checked{% endif %}>
+          {{ TIPOS[codigo] }}
+          <small>{% if codigo == "VENDA_AJUSTE" %}{{ preco|brl }} + ajuste · 2 provas{% elif codigo == "VENDA_SIMPLES" %}{{ preco|brl }} · pago na hora
+                 {% else %}{{ preco|brl }} · entrada mínima {{ entradas[codigo]|brl }}{% endif %}</small></label>
+      {% endfor %}
+    </div>
+
+    {% if v.cliente_id %}
+      <input type="hidden" name="cliente_nome" value="{{ v.cliente_nome }}"><input type="hidden" name="cliente_telefone" value="{{ v.cliente_telefone }}">
+    {% else %}
+    <div class="cliente-nova">
+      <p class="rotulo">Ou cliente nova</p>
+      <label for="cliente_nome">Nome e sobrenome</label>
+      <input id="cliente_nome" name="cliente_nome" type="text" maxlength="120" value="{{ v.cliente_nome or '' }}" autocomplete="off">
+      <label for="cliente_telefone">WhatsApp com DDD <span class="dica">Se ela já comprou aqui, o sistema reconhece pelo telefone</span></label>
+      <input id="cliente_telefone" name="cliente_telefone" type="tel" value="{{ v.cliente_telefone or '' }}" autocomplete="off">
+    </div>
+    {% endif %}
+    <h2>2. O pedido</h2>
+
+    <div class="se-aluguel">
+      <label for="data_festa">Data da festa <span class="dica">Opcional</span></label>
+      <input id="data_festa" name="data_festa" type="date" value="{{ v.data_festa or '' }}">
+    </div>
+    <div class="se-cliente">
+      <h3 class="espaco">Agenda do processo</h3>
+      <p class="suave">Retirada é obrigatória. As provas, se ficarem em branco, o sistema marca sozinho
+         (1ª prova 7 dias antes e 2ª prova 2 dias antes da retirada, às 10h). Dá para remarcar depois.</p>
+      <div class="par">
+        <div><label for="data_prova">1ª prova (medidas)</label>
+          <input id="data_prova" name="data_prova" type="date" value="{{ v.data_prova or '' }}"></div>
+        <div><label for="hora_prova">Hora</label>
+          <input id="hora_prova" name="hora_prova" type="time" value="{{ v.hora_prova or '10:00' }}"></div>
+      </div>
+      <div class="par">
+        <div><label for="data_prova2">2ª prova</label>
+          <input id="data_prova2" name="data_prova2" type="date" value="{{ v.data_prova2 or '' }}"></div>
+        <div><label for="hora_prova2">Hora</label>
+          <input id="hora_prova2" name="hora_prova2" type="time" value="{{ v.hora_prova2 or '10:00' }}"></div>
+      </div>
+      <div class="par">
+        <div><label for="data_retirada">Retirada</label>
+          <input id="data_retirada" name="data_retirada" type="date" value="{{ v.data_retirada or '' }}"></div>
+        <div><label for="hora_retirada">Hora</label>
+          <input id="hora_retirada" name="hora_retirada" type="time" value="{{ v.hora_retirada or '10:00' }}"></div>
+      </div>
+    </div>
+    <div class="se-aluguel">
+      <div class="par">
+        <div><label for="data_devolucao">Devolução</label>
+          <input id="data_devolucao" name="data_devolucao" type="date" value="{{ v.data_devolucao or '' }}"></div>
+        <div><label for="hora_devolucao">Hora</label>
+          <input id="hora_devolucao" name="hora_devolucao" type="time" value="{{ v.hora_devolucao or '10:00' }}"></div>
+      </div>
+    </div>
+    <div class="se-ajuste">
+      <label for="valor_ajuste">Valor do ajuste</label>
+      <input id="valor_ajuste" name="valor_ajuste" class="valor" inputmode="decimal" value="{{ v.valor_ajuste or '' }}">
+    </div>
+
+    <label for="valor">Quanto ela paga hoje?
+      <span class="dica">Entrada mínima: aluguel {{ regra_entrada.aluguel }}, venda com ajuste {{ regra_entrada.venda }} (do total). Venda sem ajuste: o valor todo.</span></label>
+    <input id="valor" name="valor" class="valor" inputmode="decimal" value="{{ v.valor or '' }}">
+
+    {{ f.pagamento(v, formas, maquininhas, max_parcelas, "Como ela pagou?", com_link=link_online) }}
+    <p class="suave">📒 <strong>Carnê da loja (crediário):</strong> guarde o pedido com a entrada e, na tela do pedido, toque em
+      “Parcelar no carnê da loja”. O carnê sai para imprimir em A4 ou térmica, com o código de cada parcela.</p>
+    {% if link_online %}<p class="dica se-link">Com "Link de pagamento", a peça fica guardada por {{ horas_link }} horas esperando a cliente pagar. Pagou, o pedido vira Reservado sozinho. Não pagou, a peça é liberada.</p>{% endif %}
+
+    <div class="acoes"><button type="submit" class="botao">CONTINUAR →</button></div>
+  </form>
+</section>
+{% endblock %}

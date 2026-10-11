@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% import "_icones.html" as ic %}
+{% block titulo %}Início{% endblock %}
+{% block titulo_pagina %}Olá, {{ usuario.nome.split()[0] }}{% endblock %}
+{% block conteudo %}
+{% if resumo.pedidos and resumo.pedidos.atrasadas %}<p class="aviso" role="alert"><a href="/pedidos?filtro=atrasados">{{ resumo.pedidos.atrasadas }} peça{{ "s" if resumo.pedidos.atrasadas != 1 }} com devolução atrasada. Ver a lista →</a></p>{% endif %}
+{% if resumo.conferir %}<p class="aviso"><a href="/pedidos">{{ resumo.conferir }} pagamento{{ "s" if resumo.conferir != 1 }} online precisa{{ "m" if resumo.conferir != 1 }} de conferência. Abra o pedido para ver.</a></p>{% endif %}
+
+{% if resumo.kpis %}
+<section class="painel-topo" aria-label="Resumo de hoje">
+  {% for k in resumo.kpis %}
+  <a class="kpi {{ k.cor }}" href="{{ k.url }}" data-dica="{{ k.rotulo }}: {{ k.extra }}. Clique para ver os detalhes.">
+    {{ ic.icone(k.icone, "ic-kpi") }}
+    <span class="kpi-rotulo">{{ k.rotulo }}</span>
+    <span class="kpi-valor">{{ k.valor }}</span>
+    <span class="kpi-extra">{{ k.extra }}</span>
+  </a>
+  {% endfor %}
+</section>
+{% endif %}
+
+{% if grandes %}
+<nav class="acoes-grandes" aria-label="Ações principais">
+  {% for perms, rotulo, icone, url, estilo in grandes %}
+    <a class="atalho {{ estilo }}" href="{{ url }}" data-dica="{{ dica_botao(url) }}"><span class="icone" aria-hidden="true">{{ ic.icone(icone, "ic-atalho") }}</span><span class="rotulo-atalho">{{ rotulo }}</span></a>
+  {% endfor %}
+</nav>
+{% endif %}
+
+{% if resumo.grafico or resumo.calendario %}
+<div class="painel-grade">
+  {% if resumo.grafico %}{% set g = resumo.grafico %}
+  <section class="bloco-painel" aria-labelledby="t-grafico">
+    <h2 id="t-grafico">Entradas dos últimos 14 dias <a href="/caixa">Caixa →</a></h2>
+    <p class="sub">Total no período: <strong>{{ g.total|brl }}</strong> · toque numa coluna para ver o dia</p>
+    <svg class="grafico-colunas" viewBox="0 0 {{ g.largura }} {{ g.altura }}" role="img" aria-label="Entradas por dia nos últimos 14 dias, total {{ g.total|brl }}">
+      {% for l in g.grades %}
+        <line class="grade-linha" x1="{{ g.esq }}" x2="{{ g.largura - 8 }}" y1="{{ l.y }}" y2="{{ l.y }}"/>
+        <text class="eixo-texto" x="{{ g.esq - 8 }}" y="{{ l.y + 4 }}" text-anchor="end">{{ l.rotulo }}</text>
+      {% endfor %}
+      {% for s in g.serie %}
+      <g class="barra-dia" tabindex="0" data-dica="{{ s.dia_txt }}: {{ s.rotulo }}">
+        <title>{{ s.dia_txt }}: {{ s.rotulo }}</title>
+        <rect class="alvo" x="{{ s.x - 6 }}" y="20" width="{{ s.w + 12 }}" height="{{ g.base - 20 }}"/>
+        {% if s.h > 0 %}<path class="coluna {{ 'hoje' if s.hoje }}" d="M{{ s.x }},{{ g.base }} V{{ s.y + ([4, s.h]|min) }} q0,-{{ [4, s.h]|min }} {{ [4, s.h]|min }},-{{ [4, s.h]|min }} H{{ s.x + s.w - ([4, s.h]|min) }} q{{ [4, s.h]|min }},0 {{ [4, s.h]|min }},{{ [4, s.h]|min }} V{{ g.base }} Z"/>{% endif %}
+        {% if s.mostrar %}<text class="valor-rotulo" x="{{ s.xc }}" y="{{ s.y - 6 }}" text-anchor="middle">{{ s.rotulo|replace(",00", "") }}</text>{% endif %}
+        {% if s.eixo %}<text class="eixo-texto" x="{{ s.xc }}" y="{{ g.base + 18 }}" text-anchor="middle">{{ "hoje" if s.hoje else s.dia_txt }}</text>{% endif %}
+      </g>
+      {% endfor %}
+      <line class="grade-linha" x1="{{ g.esq }}" x2="{{ g.largura - 8 }}" y1="{{ g.base }}" y2="{{ g.base }}"/>
+    </svg>
+    <p class="grafico-dica" aria-live="polite"></p>
+    <details class="tabela-grafico"><summary>Ver em tabela</summary>
+      <table><thead><tr><th>Dia</th><th>Entrou</th></tr></thead>
+        <tbody>{% for s in g.serie|reverse %}<tr><td>{{ s.dia_txt }}</td><td>{{ s.rotulo }}</td></tr>{% endfor %}</tbody></table>
+    </details>
+  </section>
+  {% endif %}
+  {% if resumo.formas is defined %}
+  <section class="bloco-painel" aria-labelledby="t-formas">
+    <h2 id="t-formas">Como a loja recebeu no mês</h2>
+    <p class="sub">Total {{ resumo.formas_total }}</p>
+    {% if resumo.formas %}
+    <ul class="medidas">
+      {% for f in resumo.formas %}
+      <li class="medida-linha"><span>{{ f.nome }}</span><strong>{{ f.valor }} · {{ f.pct }}%</strong>
+        <span class="medida-trilho" aria-hidden="true"><span class="l{{ f.nivel }}"></span></span></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="vazio">Nenhuma entrada neste mês ainda.</p>{% endif %}
+  </section>
+  {% elif resumo.calendario %}
+  <section class="bloco-painel" aria-labelledby="t-cal">{% include "_mini_calendario.html" %}</section>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if resumo.agenda is defined or resumo.proximos is defined or resumo.online %}
+<div class="painel-grade tres">
+  {% if resumo.agenda is defined %}
+  <section class="bloco-painel" aria-labelledby="t-agenda">
+    <h2 id="t-agenda">Agenda de hoje <a href="/agenda">Agenda →</a></h2>
+    <p class="sub">Provas, retiradas e devoluções marcadas</p>
+    {% if resumo.agenda %}
+    <ul class="lista-painel">
+      {% for a in resumo.agenda %}<li><span class="hora">{{ a.hora }}</span><span class="texto"><a href="/pedidos/{{ a.pedido_id }}">{{ a.cliente or "—" }}</a><small>{{ a.tipo_nome }} · {{ a.sku }}</small></span></li>{% endfor %}
+    </ul>
+    {% else %}<p class="vazio">Nada marcado para hoje.</p>{% endif %}
+    {% if resumo.calendario and resumo.formas is defined %}{% include "_mini_calendario.html" %}{% endif %}
+  </section>
+  {% endif %}
+  {% if resumo.proximos is defined %}
+  <section class="bloco-painel" aria-labelledby="t-prox">
+    <h2 id="t-prox">Retiradas e devoluções <a href="/pedidos">Pedidos →</a></h2>
+    <p class="sub">Atrasadas e próximos 7 dias</p>
+    {% if resumo.proximos %}
+    <ul class="lista-painel">
+      {% for p in resumo.proximos %}<li><span class="hora">{{ p.dia|data if p.dia else "—" }}</span>
+        <span class="texto"><a href="/pedidos/{{ p.id }}">{{ p.cliente or "Venda" }}</a><small>{{ p.o_que }} · {{ p.sku }} {{ p.peca }}</small></span>
+        {% if p.dia and p.dia < resumo.hoje %}<span class="selo-mini">atrasado</span>{% elif p.dia == resumo.hoje %}<span class="selo-mini">hoje</span>{% endif %}</li>{% endfor %}
+    </ul>
+    {% else %}<p class="vazio">Nada nos próximos dias.</p>{% endif %}
+  </section>
+  {% endif %}
+  {% if resumo.online %}{% set o = resumo.online %}
+  <section class="bloco-painel" aria-labelledby="t-online">
+    <h2 id="t-online"><span><span class="ponto-online" aria-hidden="true"></span> Online agora ({{ o.total }})</span> <a href="/online">Ver tudo →</a></h2>
+    <p class="sub">Equipe no sistema e clientes no site · também pelo WhatsApp: #online</p>
+    <ul class="online-lista">
+      {% for f in o.equipe[:6] %}<li><span class="avatar" aria-hidden="true">{{ f.nome[:1]|upper }}</span><span>{{ f.nome }}<small>Equipe · {{ f.onde }}</small></span></li>{% endfor %}
+      {% for c in o.clientes[:6] %}<li><span class="avatar" aria-hidden="true">{{ c.nome[:1]|upper }}</span><span>{{ c.nome }}<small>Cliente · {{ c.onde }}</small></span></li>{% endfor %}
+      {% if o.visitantes %}<li><span class="avatar" aria-hidden="true">+</span><span>{{ o.visitantes }} visitante{{ "s" if o.visitantes != 1 }} sem conta<small>no site</small></span></li>{% endif %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+{% endif %}
+
+<nav class="secoes-inicio" aria-label="O que você quer fazer?">
+  {% for titulo, itens in secoes %}
+  <section class="secao-inicio">
+    <h2 class="titulo-secao">{{ titulo }}</h2>
+    <div class="grade">
+      {% for perms, rotulo, icone, url, estilo in itens %}
+        <a class="atalho {{ estilo }}" href="{{ url }}" data-dica="{{ dica_botao(url) }}"><span class="icone" aria-hidden="true">{{ ic.icone(icone, "ic-atalho") }}</span><span class="rotulo-atalho">{{ rotulo }}</span></a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</nav>
+<p class="rodape-claro">Seu cargo: {{ usuario.papeis|join(", ") }}</p>
+<script src="{{ estatico('painel.js') }}" defer></script>
+{% endblock %}

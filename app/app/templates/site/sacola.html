@@ -1,0 +1,128 @@
+{% extends "site/base.html" %}
+{% block titulo %}Sacola · {{ loja.nome }}{% endblock %}
+{% block cabeca %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block antes_rodape %}{% endblock %}
+{% block conteudo %}
+<section class="bloco">
+  <h1 class="titulo-pagina">Minha sacola</h1>
+  {% if erro %}<p class="aviso-site" role="alert">{{ erro }}</p>{% endif %}
+  {% for pr in problemas %}<p class="aviso-site">Uma peça saiu da sacola: {{ pr.erro }}</p>{% endfor %}
+  {% if not sacola_ativa %}
+    <p class="centro">As compras pelo site estão desligadas no momento. <a href="/site/prova">Agende uma prova</a> ou chame no WhatsApp.</p>
+  {% elif not itens %}
+    <p class="centro">Sua sacola está vazia. <a href="/site/colecao">Ver a coleção</a></p>
+  {% else %}
+  <ul class="itens-sacola">
+    {% for p in itens %}
+    <li class="item-sacola">
+      {% if p.capa %}<img src="/fotos/{{ p.capa }}-480.jpg" alt="">{% else %}<span class="sem-foto">Foto em breve</span>{% endif %}
+      <div><strong>{{ p.nome }}</strong> <span class="suave">Ref. {{ p.sku }}{% if p.tamanho %} · tam. {{ p.tamanho }}{% endif %}</span><br>
+        {% if p.tipo == "ALUGUEL" %}Aluguel · retirada {{ p.retirada|data }} · devolução {{ p.devolucao|data }}{% elif p.ajuste %}Compra com ajuste na loja (+ {{ p.ajuste|brl }}) · pronta para {{ p.retirada|data }}{% else %}Compra{% endif %}<br>
+        <strong>{{ p.valor|brl }}</strong>{% if p.tipo == "ALUGUEL" %} <span class="suave">(entrada {{ p.entrada|brl }})</span>{% endif %}</div>
+      <form method="post" action="/site/sacola/remover"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="peca" value="{{ p.id }}">
+        <button type="submit" class="link-remover">Tirar</button></form>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <form method="get" action="/site/sacola" id="calcular-frete"></form>
+  <form method="post" action="/site/sacola/fechar" class="form-site" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="chave" value="{{ nova_chave() }}">
+    <fieldset>
+      <legend>Como você quer receber?</legend>
+      <div class="opcoes-site">
+        {% if regras.entrega_retirada %}
+        <label class="opcao-site"><input type="radio" name="entrega" value="RETIRADA" {% if (v.entrega or "RETIRADA") == "RETIRADA" %}checked{% endif %}>
+          <span>Retirar na loja <small>Sem custo. {% for u in unidades[:2] %}{{ u.nome }}: {{ u.endereco }}{% if not loop.last %} · {% endif %}{% endfor %}</small></span></label>
+        {% endif %}
+        {% if cidades %}
+        <label class="opcao-site"><input type="radio" name="entrega" value="LOCAL" {% if v.entrega == "LOCAL" %}checked{% endif %}>
+          <span>Entrega na minha cidade <small>Motoboy ou aplicativo, nas cidades abaixo.</small></span></label>
+        {% endif %}
+        {% if envio_ok %}
+        <label class="opcao-site"><input type="radio" name="entrega" value="ENVIO" {% if v.entrega == "ENVIO" %}checked{% endif %}>
+          <span>Enviar para outra cidade <small>Correios ou transportadora (Melhor Envio). Só para compra.</small></span></label>
+        {% elif valores.tem_aluguel and regras.entrega_envio %}
+        <p class="suave">Aluguel é só com retirada ou entrega local (a peça precisa voltar para a loja).</p>
+        {% endif %}
+      </div>
+    </fieldset>
+
+    {% if cidades %}
+    <div class="se-local">
+      <label for="cidade_entrega">Cidade</label>
+      <select id="cidade_entrega" name="cidade_entrega">
+        {% for c in cidades %}<option value="{{ c.id }}" {% if v.cidade_entrega == c.id %}selected{% endif %}>{{ c.cidade }}/{{ c.uf }} — {{ c.valor_centavos|brl if c.valor_centavos else "grátis" }}{% if c.prazo %} · {{ c.prazo }}{% endif %}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    {% if envio_ok %}
+    <div class="se-envio">
+      <label for="cep">CEP</label>
+      <div class="linha-consulta">
+        <input id="cep" name="cep" type="text" inputmode="numeric" maxlength="9" value="{{ v.cep or '' }}" form="calcular-frete">
+        <input type="hidden" name="entrega" value="ENVIO" form="calcular-frete">
+        <button type="submit" class="botao-site pequeno contorno" form="calcular-frete">Calcular frete</button>
+      </div>
+      <input type="hidden" name="cep" value="{{ v.cep or '' }}">
+      {% if erro_frete %}<p class="aviso-site">{{ erro_frete }}</p>{% endif %}
+      {% if opcoes_envio %}
+      <div class="opcoes-site">
+        {% for o in opcoes_envio %}<label class="opcao-site"><input type="radio" name="servico" value="{{ o.id }}" {% if v.servico == o.id|string or loop.first %}checked{% endif %}>
+          <span>{{ o.nome }} — {{ o.preco_centavos|brl }} <small>{{ o.prazo_dias }} dia{{ "s" if o.prazo_dias != 1 }} úteis</small></span></label>{% endfor %}
+      </div>
+      {% endif %}
+      <label for="cidade">Cidade</label><input id="cidade" name="cidade" type="text" maxlength="80" value="{{ v.cidade or '' }}">
+      <label for="uf">Estado (UF)</label>
+      <select id="uf" name="uf"><option value="">—</option>{% for u in UFS %}<option {% if v.uf == u %}selected{% endif %}>{{ u }}</option>{% endfor %}</select>
+    </div>
+    {% endif %}
+
+    {% if cidades or envio_ok %}
+    <fieldset class="se-entrega-endereco">
+      <legend>Endereço de entrega <span class="dica-site">(só para entrega/envio)</span></legend>
+      <label for="rua">Rua</label><input id="rua" name="rua" type="text" maxlength="120" autocomplete="address-line1" value="{{ v.rua or '' }}">
+      <label for="numero">Número</label><input id="numero" name="numero" type="text" maxlength="12" value="{{ v.numero or '' }}">
+      <label for="complemento">Complemento</label><input id="complemento" name="complemento" type="text" maxlength="60" autocomplete="address-line2" value="{{ v.complemento or '' }}">
+      <label for="bairro">Bairro</label><input id="bairro" name="bairro" type="text" maxlength="60" value="{{ v.bairro or '' }}">
+    </fieldset>
+    {% endif %}
+
+    {% if regras.sacola_pagamento == "ENTRADA_OU_TOTAL" and valores.tem_aluguel %}
+    <fieldset>
+      <legend>Quanto pagar agora?</legend>
+      <div class="opcoes-site">
+        <label class="opcao-site"><input type="radio" name="pagar" value="ENTRADA" {% if pagar == "ENTRADA" %}checked{% endif %}>
+          <span>Só a entrada do aluguel <small>O restante você paga até a retirada, na loja.</small></span></label>
+        <label class="opcao-site"><input type="radio" name="pagar" value="TOTAL" {% if pagar == "TOTAL" %}checked{% endif %}>
+          <span>Tudo agora</span></label>
+      </div>
+    </fieldset>
+    {% endif %}
+
+    <div class="resumo-sacola">
+      <dl>
+        <dt>Peças</dt><dd>{{ valores.total|brl }}</dd>
+        {% if valores.tem_aluguel %}<dt>Entrada dos aluguéis</dt><dd>{{ valores.entrada|brl }}</dd>{% endif %}
+        <dt>Entrega</dt><dd>calculada ao pagar</dd>
+        <dt class="total">A pagar agora (sem entrega)</dt><dd class="total">{{ valores.agora|brl }}</dd>
+      </dl>
+    </div>
+
+    <label class="concordo"><input type="checkbox" name="aceito" value="1">
+      Li e concordo com <a href="/site/pagina/trocas-e-devolucoes" target="_blank" rel="noopener">trocas, devoluções e aluguel</a>
+      e com o contrato de aluguel (assinado na prova).</label>
+    {% if not pagamento_ok %}
+      <p class="aviso-site">O pagamento online está indisponível agora. Chame a loja no WhatsApp.</p>
+    {% elif conta %}
+      <button type="submit" class="botao-site">Pagar com Pix ou cartão (Mercado Pago)</button>
+    {% else %}
+      <p class="centro"><a class="botao-site" href="/site/conta/entrar?proximo=/site/sacola">Entrar ou criar conta para pagar</a></p>
+    {% endif %}
+    <p class="aviso-pagamento">🔒 Você paga na página segura do Mercado Pago. A loja não vê nem guarda os dados do seu cartão.</p>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

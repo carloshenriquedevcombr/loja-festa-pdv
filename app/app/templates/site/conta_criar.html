@@ -1,0 +1,27 @@
+{% extends "site/base.html" %}
+{% block titulo %}Criar conta · {{ loja.nome }}{% endblock %}
+{% block cabeca %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block antes_rodape %}{% endblock %}
+{% block conteudo %}
+<section class="pagina-estreita">
+  <h1 class="titulo-pagina">{{ "Complete seu cadastro" if completar else "Criar minha conta" }}</h1>
+  {% if erro %}<p class="aviso-site" role="alert">{{ erro }}</p>{% endif %}
+  <form method="post" action="{{ '/site/conta/completar' if completar else '/site/conta/criar' }}" class="form-site" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="proximo" value="{{ proximo }}">
+    <label for="nome">Nome e sobrenome</label>
+    <input id="nome" name="nome" type="text" maxlength="120" autocomplete="name" value="{{ v.nome or '' }}">
+    {% if not completar %}
+    <label for="telefone">WhatsApp com DDD {% if zap %}<span class="dica-site">(vamos mandar um código para confirmar)</span>{% endif %}</label>
+    <input id="telefone" name="telefone" type="tel" autocomplete="tel" value="{{ v.telefone or '' }}">
+    {% endif %}
+    <label for="email">E-mail <span class="dica-site">{{ "(opcional se for entrar só pelo WhatsApp)" if zap else "" }}</span></label>
+    <input id="email" name="email" type="email" maxlength="120" autocomplete="email" value="{{ v.email or '' }}">
+    <label for="senha">Senha <span class="dica-site">{{ "(opcional) " if zap }}8 a 32, com maiúscula, minúscula, número e símbolo</span></label>
+    <input id="senha" name="senha" type="password" autocomplete="new-password" maxlength="32">
+    <label class="concordo"><input type="checkbox" name="lgpd" value="1" {% if v.lgpd == "1" %}checked{% endif %}>
+      Li e concordo com a <a href="/site/pagina/politica-de-privacidade" target="_blank" rel="noopener">Política de privacidade</a>. Meus dados são usados só para o atendimento da loja.</label>
+    <button type="submit" class="botao-site">{{ "Continuar" if zap and not completar else "Criar conta" }}</button>
+  </form>
+  <p class="centro suave">Já tem conta? <a href="/site/conta/entrar?proximo={{ proximo|urlencode }}">Entrar</a></p>
+</section>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block titulo %}Regras da vitrine{% endblock %}
+{% block voltar %}/{% endblock %}
+{% block conteudo %}
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+<form method="post" action="/config/vitrine" novalidate>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+
+  <section class="cartao">
+    <h2>Quando a peça sai do estoque?</h2>
+    <fieldset class="opcoes opcoes-empilhadas">
+      <legend class="sr-only">Modo de reserva</legend>
+      <label class="opcao"><input type="radio" name="reserva_modo" value="ATE_DEVOLVER" {% if r.reserva_modo == "ATE_DEVOLVER" %}checked{% endif %}>Do pagamento até a devolução
+        <small>A peça sai do aluguel e do site no dia em que a cliente paga a entrada ou assina o contrato, e só volta quando a atendente aperta "Cliente devolveu". Se a cliente atrasar, continua fora.</small></label>
+      <label class="opcao"><input type="radio" name="reserva_modo" value="DATAS" {% if r.reserva_modo == "DATAS" %}checked{% endif %}>Só nas datas do aluguel
+        <small>A peça fica presa da 1ª prova até a devolução marcada. Antes disso pode ser alugada para outras datas.</small></label>
+    </fieldset>
+    <p class="suave">Depois da devolução a peça fica mais <strong>{{ dias_limpeza }} dia{{ "s" if dias_limpeza != 1 }}</strong> na limpeza
+      (ou volta antes, quando alguém aperta "Voltou da limpeza"). Os dias de limpeza ficam em {% if pode("config.ver") %}<a href="/config">Configurações</a>{% else %}Configurações{% endif %}.</p>
+    <p class="suave">Mudar esta regra vale para os pedidos <strong>novos</strong>. Os pedidos que já existem seguem a regra de quando foram feitos.</p>
+  </section>
+
+  <section class="cartao">
+    <h2>Peça alugada no site</h2>
+    <fieldset class="opcoes opcoes-empilhadas">
+      <legend class="sr-only">Peça alugada no site</legend>
+      <label class="opcao"><input type="radio" name="alugada_no_site" value="OCUPADA" {% if r.alugada_no_site == "OCUPADA" %}checked{% endif %}>Continua aparecendo, marcada como ocupada
+        <small>A cliente vê a peça, mas o calendário do site mostra que não está livre. Ela pode chamar no WhatsApp.</small></label>
+      <label class="opcao"><input type="radio" name="alugada_no_site" value="ESCONDE" {% if r.alugada_no_site == "ESCONDE" %}checked{% endif %}>Some do site até voltar
+        <small>Enquanto estiver reservada ou com a cliente, a peça não aparece em lugar nenhum do site.</small></label>
+    </fieldset>
+    <label class="opcao"><input type="checkbox" name="venda_ajuste_some" value="1" {% if r.venda_ajuste_some %}checked{% endif %}>Peça vendida com ajuste some do site na hora do pedido
+      <small>Recomendado: ela não volta mais para o estoque.</small></label>
+    <p class="suave">Peça vendida, em manutenção ou arquivada nunca aparece no site.</p>
+  </section>
+
+  <section class="cartao">
+    <h2>Prova pelo site e atrasos</h2>
+    <label for="prova_antecedencia_dias">Antecedência mínima para pedir prova pelo site (dias) <span class="dica">0 = pode pedir para hoje</span></label>
+    <input id="prova_antecedencia_dias" name="prova_antecedencia_dias" type="text" inputmode="numeric" maxlength="2" value="{{ r.prova_antecedencia_dias }}">
+    <p class="suave">O site só aceita os dias em que a loja abre{% if pode("whatsapp.config") %} (veja em <a href="/config/whatsapp#horario">Horário da loja</a>){% endif %}.</p>
+    <label for="atraso_aviso_hora">Horário do aviso de peças em atraso (WhatsApp da cliente e da equipe)</label>
+    <input id="atraso_aviso_hora" name="atraso_aviso_hora" type="time" value="{{ r.atraso_aviso_hora.strftime('%H:%M') }}">
+  </section>
+
+  <div class="acoes"><button type="submit" class="botao">✓ SALVAR REGRAS</button></div>
+</form>
+{% endblock %}

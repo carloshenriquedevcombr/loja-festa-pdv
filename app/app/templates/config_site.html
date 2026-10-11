@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block titulo %}Site e pagamento online{% endblock %}
+{% block voltar %}/config{% endblock %}
+{% block conteudo %}
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+
+{% if edita_site %}<div class="acoes compacta espaco-baixo">
+  <a class="botao claro" href="/config/marca">🖼 Logo e marca →</a>
+  <a class="botao claro" href="/config/rodape">▤ Rodapé: lojas, mapa e páginas →</a>
+  <a class="botao claro" href="/config/redes">♥ Redes sociais →</a>
+</div>{% endif %}
+<section class="cartao" id="dados">
+  <h2>Vitrine na internet</h2>
+  <p>{{ no_site }} peça{{ "s" if no_site != 1 }} aparecendo no site agora.
+     <a href="/site" target="_blank" rel="noopener">Abrir o site →</a></p>
+  <form method="post" action="/config/site/dados" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="opcoes largas">
+      <label class="opcao"><input type="checkbox" name="site_ativo" value="1" {% if loja.site_ativo %}checked{% endif %} {% if not edita_site %}disabled{% endif %}>Site ligado<small>Desmarcado: o site mostra só "voltamos em breve"</small></label>
+    </div>
+    <label for="frase_site">Frase de boas-vindas <span class="dica">Ex.: Vestidos de festa para aluguel e venda em Mogi Guaçu</span></label>
+    <input id="frase_site" name="frase_site" type="text" maxlength="200" value="{{ loja.frase_site or '' }}" {% if not edita_site %}disabled{% endif %}>
+    <label for="whatsapp">WhatsApp da loja <span class="dica">Os botões "Chamar no WhatsApp" do site usam este número</span></label>
+    <input id="whatsapp" name="whatsapp" type="tel" value="{{ loja.whatsapp|telefone if loja.whatsapp else '' }}" {% if not edita_site %}disabled{% endif %}>
+    <label for="instagram">Instagram <span class="dica">Só o nome do perfil, sem @</span></label>
+    <input id="instagram" name="instagram" type="text" maxlength="30" value="{{ loja.instagram or '' }}" {% if not edita_site %}disabled{% endif %}>
+    <label for="horario">Horário de atendimento <span class="dica">Ex.: Seg a sex 9h às 18h · Sáb 9h às 13h</span></label>
+    <input id="horario" name="horario" type="text" maxlength="120" value="{{ loja.horario or '' }}" {% if not edita_site %}disabled{% endif %}>
+    {% if edita_site %}<div class="acoes"><button type="submit" class="botao">✓ SALVAR DADOS DO SITE</button></div>{% endif %}
+  </form>
+  <p class="suave">Endereço, telefone e CNPJ ficam em Configurações → Dados da loja.</p>
+</section>
+
+<section class="cartao" id="ocasioes">
+  <h2>Ocasiões (menu do site)</h2>
+  <p class="suave">É assim que as clientes procuram no site: Casamento › Madrinha, Festa › Debutante… Ao cadastrar uma peça, você marca em quais ocasiões ela aparece.</p>
+  {% for g in grupos %}
+  <div class="grupo-ocasiao {{ '' if g.ativa else 'desligada' }}">
+    <div class="linha-ocasiao">
+      <strong class="nome-ocasiao">{{ g.nome }}</strong>{% if not g.ativa %} <span class="selo neutro">Escondida</span>{% endif %}
+      {% if edita_site %}
+      <span class="acoes compacta">
+        <form method="post" action="/config/site/ocasioes/{{ g.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="subir"><button class="botao claro pequeno" aria-label="Subir {{ g.nome }}">↑</button></form>
+        <form method="post" action="/config/site/ocasioes/{{ g.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="descer"><button class="botao claro pequeno" aria-label="Descer {{ g.nome }}">↓</button></form>
+        <form method="post" action="/config/site/ocasioes/{{ g.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="{{ 'desativar' if g.ativa else 'ativar' }}"><button class="botao claro pequeno">{{ "Esconder" if g.ativa else "Mostrar" }}</button></form>
+      </span>
+      {% endif %}
+    </div>
+    <ul class="filhos-ocasiao">
+      {% for o in g.filhos %}
+      <li class="{{ '' if o.ativa else 'desligada' }}">
+        {% if edita_site %}
+        <form method="post" action="/config/site/ocasioes/{{ o.id }}" class="renomear">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="renomear">
+          <label class="sr-only" for="oc{{ o.id }}">Nome</label>
+          <input id="oc{{ o.id }}" name="nome" type="text" maxlength="60" value="{{ o.nome }}">
+          <button class="botao claro pequeno">Salvar</button>
+        </form>
+        <form method="post" action="/config/site/ocasioes/{{ o.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="{{ 'desativar' if o.ativa else 'ativar' }}"><button class="botao claro pequeno">{{ "Esconder" if o.ativa else "Mostrar" }}</button></form>
+        {% else %}{{ o.nome }}{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+  {% if edita_site %}
+  <form method="post" action="/config/site/ocasioes" class="espaco" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h3>Criar ocasião</h3>
+    <label for="nova_ocasiao">Nome <span class="dica">Ex.: Mãe da debutante, Chá revelação, Pajem</span></label>
+    <input id="nova_ocasiao" name="nome" type="text" maxlength="60">
+    <span class="rotulo">Fica dentro de</span>
+    <div class="opcoes">
+      <label class="opcao"><input type="radio" name="pai" value="" checked>É um grupo novo<small>aparece no menu principal</small></label>
+      {% for g in grupos %}<label class="opcao"><input type="radio" name="pai" value="{{ g.id }}">{{ g.nome }}</label>{% endfor %}
+    </div>
+    <div class="acoes"><button type="submit" class="botao">✚ CRIAR</button></div>
+  </form>
+  {% endif %}
+</section>
+
+<section class="cartao" id="tipos">
+  <h2>Tipos de peça e código</h2>
+  <div class="tabela-vidro"><table>
+    <tr><th>Tipo</th><th>Código</th><th class="num">Peças</th></tr>
+    {% for t in tipos %}<tr><td>{{ t.nome }}</td><td><span class="sku">{{ t.prefixo_sku }}-0001</span></td><td class="num">{{ t.pecas }}</td></tr>{% endfor %}
+  </table></div>
+  {% if edita_site %}
+  <form method="post" action="/config/site/tipos" class="espaco" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="par">
+      <div><label for="tipo_nome">Novo tipo</label><input id="tipo_nome" name="nome" type="text" maxlength="40" placeholder="Ex.: Vestido infantil"></div>
+      <div><label for="tipo_prefixo">Código</label><input id="tipo_prefixo" name="prefixo" type="text" maxlength="5" placeholder="VIN"></div>
+    </div>
+    <div class="acoes"><button type="submit" class="botao claro">✚ CRIAR TIPO</button></div>
+  </form>
+  {% endif %}
+</section>
+
+<section class="cartao" id="pagamento">
+  <h2>Pagamento online (link)</h2>
+  {% if online %}
+    <p class="sucesso">Ligado · Mercado Pago · conta <strong>{{ online.conta }}</strong> · token terminado em ••••{{ online.token_final }} · desde {{ online.quando }}</p>
+  {% else %}
+    <p>Desligado. Ligando, a loja consegue mandar um link para a cliente pagar por Pix ou cartão (pedido feito pelo WhatsApp).</p>
+  {% endif %}
+  {% if edita_pagamento %}
+  <details class="passo-a-passo">
+    <summary>Como pegar o token no Mercado Pago (passo a passo)</summary>
+    <ol>
+      <li>No computador, entre em <strong>mercadopago.com.br/developers/panel</strong> com a conta da loja.</li>
+      <li>Clique em <strong>Criar aplicação</strong>. Nome: o nome da loja. Tipo de pagamento: <strong>Pagamentos online</strong>, produto <strong>Checkout Pro</strong>.</li>
+      <li>Abra a aplicação e vá em <strong>Credenciais de produção</strong>.</li>
+      <li>Copie o <strong>Access Token</strong> (começa com <code>APP_USR-</code>) e cole abaixo.</li>
+    </ol>
+    <p class="suave">O token fica guardado cifrado. Ninguém consegue ver ele de novo aqui, nem o desenvolvedor.</p>
+  </details>
+  <form method="post" action="/config/site/pagamento" novalidate autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="token">{{ "Trocar o token" if online else "Access Token do Mercado Pago" }}</label>
+    <input id="token" name="token" type="password" autocomplete="off" spellcheck="false" placeholder="APP_USR-...">
+    <div class="acoes"><button type="submit" class="botao">✓ CONFERIR E SALVAR</button></div>
+  </form>
+  {% if online %}
+  <form method="post" action="/config/site/pagamento/desligar" class="acoes">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="botao claro pequeno">Desligar pagamento online</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</section>
+{% endblock %}

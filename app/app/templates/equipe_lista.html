@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block titulo %}Equipe{% endblock %}
+{% block conteudo %}
+{% if pode("usuarios.operacionais") %}
+<div class="acoes compacta espaco-baixo"><a class="botao" href="/equipe/novo">✚ Cadastrar funcionário</a></div>
+{% endif %}
+<div class="lista">
+{% for p in pessoas %}
+  <a class="item" href="/equipe/{{ p.id }}">
+    <span class="principal"><span class="titulo-item">{{ p.nome }}</span><br>
+      <span class="suave">usuário: {{ p.login }} · {{ p.cargos }}</span></span>
+    {% if not p.ativo %}<span class="selo neutro">Desativado</span>
+    {% elif p.bloqueado %}<span class="selo alerta">Bloqueado</span>
+    {% else %}<span class="selo ok">Ativo</span>{% endif %}
+    {% if p.vinculo == "FREELANCE" %}<span class="selo info">Freelance{% if p.ate %} até {{ (p.ate - timedelta(days=1)).date()|data }}{% endif %}</span>{% endif %}
+  </a>
+{% endfor %}
+</div>
+{% endblock %}

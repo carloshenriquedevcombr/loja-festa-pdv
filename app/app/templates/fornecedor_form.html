@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% import "_formulario.html" as fm %}
+{% block titulo %}{{ "Cadastrar fornecedor" if novo else f.nome }}{% endblock %}
+{% block voltar %}/fornecedores{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {{ fm.erro_box(erro) }}
+  {% if ok %}<p class="sucesso" role="status">Guardado.</p>{% endif %}
+  {% set editar = pode("fornecedores.editar") %}
+  <form method="post" action="{{ '/fornecedores/novo' if novo else '/fornecedores/' ~ f.id }}" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <fieldset {% if not editar %}disabled{% endif %}>
+    <label for="nome">Nome ou razão social</label>
+    <input id="nome" name="nome" type="text" maxlength="120" value="{{ v.nome or '' }}" autocomplete="off">
+    <label for="categoria">O que fornece</label>
+    <select id="categoria" name="categoria">
+      <option value="">— Escolha —</option>
+      {% for c in CATEGORIAS %}<option {% if v.categoria == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+    <label for="documento">CPF ou CNPJ <span class="dica">Opcional. Só números</span></label>
+    <input id="documento" name="documento" type="text" inputmode="numeric" maxlength="18" value="{{ v.documento or '' }}" autocomplete="off">
+    <label for="telefone">Telefone com DDD <span class="dica">Opcional</span></label>
+    <input id="telefone" name="telefone" type="tel" value="{{ v.telefone or '' }}" autocomplete="off">
+    <label for="email">E-mail <span class="dica">Opcional</span></label>
+    <input id="email" name="email" type="email" maxlength="120" value="{{ v.email or '' }}" autocomplete="off">
+    <label for="pix">Chave Pix para pagar <span class="dica">Opcional</span></label>
+    <input id="pix" name="pix" type="text" maxlength="120" value="{{ v.pix or '' }}" autocomplete="off">
+    <label for="observacoes">Observações <span class="dica">Ex.: entrega às terças, prazo 5 dias</span></label>
+    <textarea id="observacoes" name="observacoes" maxlength="500">{{ v.observacoes or '' }}</textarea>
+    {% if not novo %}
+    <span class="rotulo">Situação</span>
+    <div class="opcoes">
+      <label class="opcao"><input type="radio" name="ativo" value="1" {% if v.ativo %}checked{% endif %}>Ativo</label>
+      <label class="opcao"><input type="radio" name="ativo" value="0" {% if not v.ativo %}checked{% endif %}>Inativo<small>Some da lista do “Paguei algo”</small></label>
+    </div>
+    {% endif %}
+    {% if editar %}<div class="acoes"><button type="submit" class="botao">{{ "✓ CADASTRAR" if novo else "✓ SALVAR" }}</button></div>{% endif %}
+    </fieldset>
+  </form>
+</section>
+{% if not novo %}
+<section class="cartao">
+  <h2>Pagamentos a este fornecedor</h2>
+  {% if pagos %}
+  <table class="tabela-parcelas">
+    <thead><tr><th>Data</th><th>O quê</th><th>Como</th><th>Valor</th></tr></thead>
+    <tbody>{% for t in pagos %}
+      <tr><td>{{ t.quando }}</td><td>{{ t.descricao }}{% if t.documento %}<br><span class="suave">nota {{ t.documento }}</span>{% endif %}{% if t.anexo %} <a href="/caixa/nota/{{ t.anexo }}" target="_blank" rel="noopener">📎</a>{% endif %}</td>
+        <td>{{ FORMAS[t.forma_pagamento] }}{% if t.parcelas > 1 %} {{ t.parcelas }}x{% endif %}</td>
+        <td>{{ "−" if t.tipo == "ENTRADA" }}{{ t.valor_centavos|brl }}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<p class="suave">Nenhum pagamento lançado ainda.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

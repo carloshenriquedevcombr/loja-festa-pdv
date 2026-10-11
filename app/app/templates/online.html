@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block cabeca %}<meta http-equiv="refresh" content="30">{% endblock %}
+{% block titulo %}Online agora{% endblock %}
+{% block conteudo %}
+<p class="suave">Atualiza sozinho a cada 30 segundos. Online = página aberta nos últimos 3 minutos. Pelo WhatsApp: mande <strong>#online</strong>.</p>
+<div class="online-grade">
+  <section class="bloco-painel">
+    <h2>Equipe no sistema ({{ o.equipe|length }})</h2>
+    {% if o.equipe %}<ul class="online-lista">
+      {% for f in o.equipe %}<li><span class="avatar" aria-hidden="true">{{ f.nome[:1]|upper }}</span>
+        <span><strong>{{ f.nome }}</strong><small>{{ f.cargos }} · {{ f.onde }} · {{ f.descricao or "" }} · desde {{ f.desde }}</small></span></li>{% endfor %}
+    </ul>{% else %}<p class="vazio">Ninguém da equipe com o sistema aberto.</p>{% endif %}
+  </section>
+  <section class="bloco-painel">
+    <h2>Clientes no site ({{ o.clientes|length + o.visitantes }})</h2>
+    {% if o.clientes %}<ul class="online-lista">
+      {% for c in o.clientes %}<li><span class="avatar" aria-hidden="true">{{ c.nome[:1]|upper }}</span>
+        <span><strong>{{ c.nome }}</strong><small>Com conta · {{ c.onde }} · desde {{ c.desde }}</small></span></li>{% endfor %}
+    </ul>{% endif %}
+    <p class="vazio">{{ o.visitantes }} visitante{{ "s" if o.visitantes != 1 }} sem conta navegando agora.</p>
+  </section>
+  <section class="bloco-painel">
+    <h2>Visto por último (equipe)</h2>
+    <ul class="online-lista">{% for u in ultimos %}<li><span class="avatar" aria-hidden="true">{{ u.nome[:1]|upper }}</span><span>{{ u.nome }}<small>{{ u.quando or "nunca entrou" }}</small></span></li>{% endfor %}</ul>
+  </section>
+</div>
+{% endblock %}

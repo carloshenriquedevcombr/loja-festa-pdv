@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  segredos:
+    name: Nenhuma senha no código
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {fetch-depth: 0}
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  banco:
+    name: Banco e app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Cliente PostgreSQL
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Construir e subir a imagem do banco (a mesma da produção)
+        run: |
+          docker build -t loja-db -f db/Dockerfile .
+          docker run -d --name pg -p 5432:5432 \
+            -e POSTGRES_PASSWORD=ci -e APP_DB_PASSWORD=ci_app loja-db
+          for i in $(seq 1 30); do docker exec pg pg_isready -U postgres && break; sleep 2; done
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: {python-version: "3.12"}
+      - run: pip install -r app/requirements.txt
+      - name: Testes das travas
+        env: {PGHOST: localhost, PGPORT: "5432", PGUSER: postgres, PGPASSWORD: ci}
+        run: python tests/test_banco.py
+      - name: App de ponta a ponta (cada cargo, cada botão)
+        env: {PGHOST: localhost, PGPORT: "5432", PGUSER: postgres, PGPASSWORD: ci,
+              APP_DB_PASSWORD: ci_app, LOG_LEVEL: WARNING}
+        run: python tests/test_app.py
+      - name: Atualização de banco que já tem dados
+        env: {PGHOST: localhost, PGPORT: "5432", PGUSER: postgres, PGPASSWORD: ci,
+              APP_DB_PASSWORD: ci_app, DADOS_CHAVE: abababababababababababababababababababababababababababababababab}
+        run: python tests/test_migracao.py
+      - name: Backup e restauração
+        env: {PGHOST: localhost, PGPORT: "5432", PGUSER: postgres, PGPASSWORD: ci,
+              PGDATABASE: loja_teste, BACKUP_DIR: /tmp/backups}
+        run: |
+          MANTER_BANCO=1 python tests/test_banco.py > /dev/null
+          bash backup/backup.sh
+          bash backup/restore-test.sh
+
+  app:
+    name: App (análise e segurança)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: {python-version: "3.12"}
+      - run: pip install -r app/requirements.txt bandit pip-audit
+      - name: Compila
+        run: python -m compileall -q app/app
+      - name: Bandit (falhas de segurança no código)
+        run: bandit -q -r app/app -ll
+      - name: pip-audit (dependências com vulnerabilidade conhecida)
+        run: pip-audit -r app/requirements.txt
+
+  integracao:
+    name: Ponta a ponta (login real)
+    runs-on: ubuntu-latest
+    needs: [banco, app]
+    env:
+      APP_DB_PASSWORD: ${{ github.run_id }}app
+      SENHA_DONA: Senha-de-teste-ci-123
+      DADOS_CHAVE: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Construir imagens
+        run: |
+          docker build -t loja-db -f db/Dockerfile .
+          docker build -t loja-app ./app
+          docker build -t loja-backup ./backup
+      - name: Subir banco e aplicar migrações
+        run: |
+          docker network create loja
+          docker run -d --name db --network loja -e POSTGRES_DB=loja -e POSTGRES_USER=loja_owner \
+            -e POSTGRES_PASSWORD=ci -e APP_DB_PASSWORD="$APP_DB_PASSWORD" loja-db
+          for i in $(seq 1 30); do docker exec db pg_isready -U loja_owner -d loja && break; sleep 2; done
+          docker exec db migrate.sh
+      - name: Criar loja pela CLI
+        run: |
+          COMUM="-e DATABASE_URL=postgresql://app_user:$APP_DB_PASSWORD@db:5432/loja -e SESSION_SECRET=$(openssl rand -hex 32) -e DADOS_CHAVE=$DADOS_CHAVE"
+          echo "$SENHA_DONA" | docker run -i --rm --network loja $COMUM loja-app \
+            python -m app.cli criar-loja --nome "Loja CI" --login dona --nome-dona "Maria" --senha-stdin | tee saida.txt
+          echo "LOJA_ID=$(grep -oP 'LOJA_ID=\K[0-9a-f-]+' saida.txt)" >> "$GITHUB_ENV"
+      - name: Subir o app
+        run: |
+          docker run -d --name app --network loja -p 8000:8000 \
+            -e DATABASE_URL="postgresql://app_user:$APP_DB_PASSWORD@db:5432/loja" \
+            -e SESSION_SECRET="$(openssl rand -hex 32)" -e DADOS_CHAVE="$DADOS_CHAVE" -e LOJA_ID="$LOJA_ID" -e COOKIE_SECURE=0 loja-app
+          for i in $(seq 1 30); do curl -sf localhost:8000/health && break; sleep 2; done
+      - name: Health, cabeçalhos e login
+        run: |
+          set -e
+          curl -sf localhost:8000/health | grep -q '"loja_configurada":true'
+          curl -sI localhost:8000/login | grep -qi "content-security-policy"
+          # Sem login, a tela inicial manda para o login
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/)" = 303
+          # Senha errada é recusada
+          curl -s -c jar localhost:8000/login > p.html
+          T=$(grep -oP 'name="csrf" value="\K[^"]+' p.html)
+          test "$(curl -s -b jar -c jar -o /dev/null -w '%{http_code}' \
+                  --data-urlencode csrf=$T -d login=dona -d senha=errada localhost:8000/login)" = 401
+          # Sem token CSRF é recusado
+          test "$(curl -s -b jar -o /dev/null -w '%{http_code}' \
+                  -d login=dona --data-urlencode senha=$SENHA_DONA localhost:8000/login)" = 400
+          # Senha certa entra e vê a tela da Dona
+          curl -s -b jar -c jar localhost:8000/login > p.html
+          T=$(grep -oP 'name="csrf" value="\K[^"]+' p.html)
+          test "$(curl -s -b jar -c jar -o /dev/null -w '%{http_code}' \
+                  --data-urlencode csrf=$T -d login=dona --data-urlencode senha=$SENHA_DONA localhost:8000/login)" = 303
+          curl -s -b jar localhost:8000/ | tee inicio.html | grep -q "Olá, Maria"
+          grep -q "Recebi dinheiro" inicio.html
+          # Login e falha ficaram na auditoria
+          docker exec db psql -U loja_owner -d loja -Atc \
+            "SELECT string_agg(acao, ',' ORDER BY id) FROM auditoria" | grep -q "login_falhou,login_ok"
+          echo "Ponta a ponta OK"
+      - name: Backup dentro do container
+        run: |
+          docker run --rm --network loja -e PGHOST=db -e PGUSER=loja_owner -e PGPASSWORD=ci \
+            -e PGDATABASE=loja loja-backup bash -c "backup.sh && restore-test.sh"
+      - name: Logs do app (em caso de falha)
+        if: failure()
+        run: docker logs app || true

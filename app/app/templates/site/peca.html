@@ -1,0 +1,128 @@
+{% extends "site/base.html" %}
+{% import "site/_card.html" as c %}
+{% block titulo %}{{ p.nome }} · {{ loja.nome }}{% endblock %}
+{% block descricao %}{{ (p.descricao or p.nome)[:150] }}{% endblock %}
+{% block cabeca %}{% if galeria %}<meta property="og:image" content="/fotos/{{ galeria[0].arquivo }}-960.jpg">{% endif %}{% endblock %}
+{% block conteudo %}
+<div class="peca">
+  <nav class="trilha" aria-label="Você está em"><a href="/site">Início</a>
+    {% if ocasioes %} <span aria-hidden="true">/</span> <a href="/site/c/{{ ocasioes[0].pai_slug or ocasioes[0].slug }}">{{ ocasioes[0].pai_nome or ocasioes[0].nome }}</a>{% endif %}
+    <span aria-hidden="true">/</span> <span>{{ p.nome }}</span></nav>
+
+  <div class="peca-grade">
+    <div class="galeria">
+      {% if galeria %}
+        {% for f in galeria %}<input type="radio" name="foto" id="foto{{ loop.index }}" class="alternador" {% if loop.first %}checked{% endif %}>{% endfor %}
+        <div class="galeria-fotos">
+          {% for f in galeria %}
+          <figure class="foto-grande f{{ loop.index }}">
+            <img src="/fotos/{{ f.arquivo }}-960.jpg" srcset="/fotos/{{ f.arquivo }}-960.jpg 960w, /fotos/{{ f.arquivo }}-1600.jpg 1600w"
+                 sizes="(max-width: 900px) 100vw, 55vw" alt="{{ p.nome }} — foto {{ loop.index }}" {% if not loop.first %}loading="lazy"{% endif %}>
+          </figure>
+          {% endfor %}
+        </div>
+        {% if galeria|length > 1 %}
+        <div class="miniaturas">
+          {% for f in galeria %}<label for="foto{{ loop.index }}" class="mini m{{ loop.index }}"><img src="/fotos/{{ f.arquivo }}-480.jpg" alt="Ver foto {{ loop.index }}" loading="lazy"></label>{% endfor %}
+        </div>
+        {% endif %}
+      {% else %}
+        <div class="sem-foto grande">Foto em breve</div>
+      {% endif %}
+    </div>
+
+    <div class="peca-info">
+      <p class="sku-site">Ref. {{ p.sku }}</p>
+      <h1>{{ p.nome }}</h1>
+      <p class="preco-site">{{ p.preco_texto }}</p>
+      {% for nome, s in parcelas.items() %}
+      <details class="parcelas-site">
+        <summary>{{ nome }}: reserve com {{ s.entrada|brl }}{% if s.maximo and s.maximo.vezes > 1 %} · ou até {{ s.maximo.vezes }}× de {{ s.maximo.parcela|brl }}{% if s.sem_juros_ate > 1 %} ({{ s.sem_juros_ate }}× sem juros){% endif %}{% endif %}</summary>
+        <ul>{% for o in s.opcoes %}<li><span>{{ o.vezes }}× de {{ o.parcela|brl }}</span><span>{{ "sem juros" if o.sem_juros else "total " ~ (o.total|brl) }}</span></li>{% endfor %}</ul>
+        <p>Pix, dinheiro ou cartão. Reserva garantida com a entrada; o restante até a retirada.</p>
+      </details>
+      {% endfor %}
+      <dl class="ficha">
+        {% if p.tamanho %}<div><dt>Tamanho</dt><dd>{{ p.tamanho }}</dd></div>{% endif %}
+        {% if p.cor %}<div><dt>Cor</dt><dd>{{ p.cor }}</dd></div>{% endif %}
+        {% if p.comprimento %}<div><dt>Comprimento</dt><dd>{{ COMPRIMENTO[p.comprimento] }}</dd></div>{% endif %}
+        <div><dt>Para</dt><dd>{{ PUBLICO[p.publico] }} · {{ FAIXA[p.faixa] }}</dd></div>
+        <div><dt>Disponível para</dt><dd>{{ "Aluguel e venda" if p.pode_alugar and p.pode_vender else ("Aluguel" if p.pode_alugar else "Venda") }}</dd></div>
+      </dl>
+
+      {% if alugada_agora %}<p class="resposta-data ocupada">No momento esta peça está com uma cliente. Chame no WhatsApp para saber quando ela volta.</p>{% endif %}
+      <form method="get" action="/site/p/{{ p.slug }}" class="consulta-data">
+        <label for="data">Está livre na data da sua festa?</label>
+        <div class="linha-consulta">
+          <input id="data" name="data" type="date" min="{{ hoje.isoformat() }}" value="{{ data }}">
+          <button type="submit" class="botao-site pequeno contorno">Consultar</button>
+        </div>
+        {% if consulta %}
+          {% if consulta.erro %}<p class="resposta-data erro">{{ consulta.erro }}</p>
+          {% elif consulta.livre %}<p class="resposta-data livre">✓ Livre em {{ consulta.dia|data }}. Agende a prova para garantir.</p>
+          {% else %}<p class="resposta-data ocupada">Já reservada perto de {{ consulta.dia|data }}. <a href="/site/colecao?data={{ consulta.dia.isoformat() }}">Ver peças livres nessa data</a></p>{% endif %}
+        {% endif %}
+      </form>
+
+      {% if loja.sacola_ativa and not p.preco_no_site %}
+      <p class="suave">Preço e compra desta peça pelo WhatsApp ou na loja.</p>
+      {% endif %}
+      {% if loja.sacola_ativa and p.preco_no_site %}
+      <div class="adicionar-sacola" id="sacola">
+        {% if sacola_erro %}<p class="aviso-site" role="alert">{{ sacola_erro }}</p>{% endif %}
+        {% if p.pode_alugar and p.preco_aluguel_centavos and not alugada_agora %}
+        <form method="post" action="/site/sacola/adicionar">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="peca" value="{{ p.id }}"><input type="hidden" name="tipo" value="ALUGUEL">
+          <div class="datas">
+            <div><label for="retirada">Retirada</label><input id="retirada" name="retirada" type="date" min="{{ hoje.isoformat() }}" value="{{ data }}"></div>
+            <div><label for="devolucao">Devolução</label><input id="devolucao" name="devolucao" type="date" min="{{ hoje.isoformat() }}"></div>
+          </div>
+          <button type="submit" class="botao-site grande">Alugar · colocar na sacola</button>
+        </form>
+        {% endif %}
+        {% if p.pode_vender and p.preco_venda_centavos %}
+        <form method="post" action="/site/sacola/adicionar" class="comprar-online">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="peca" value="{{ p.id }}"><input type="hidden" name="tipo" value="VENDA">
+          <p class="rotulo-comprar">Comprar online</p>
+          {% if loja.ajuste_site_centavos %}
+          <div class="escolha-ajuste">
+            <label class="opcao-site"><input type="radio" name="ajuste" value="0" checked>
+              <span>Sem ajuste · <strong>{{ p.preco_venda_centavos|brl }}</strong><small>A peça como está, no tamanho {{ p.tamanho or "da foto" }}.</small></span></label>
+            <label class="opcao-site"><input type="radio" name="ajuste" value="1">
+              <span>Com ajuste na loja · <strong>{{ (p.preco_venda_centavos + loja.ajuste_site_centavos)|brl }}</strong>
+                <small>+ {{ loja.ajuste_site_centavos|brl }}: você prova na loja e a costureira deixa do seu jeito.</small></span></label>
+            <div><label for="pronta_em">Com ajuste: para quando precisa da peça pronta?</label>
+              <input id="pronta_em" name="retirada" type="date" min="{{ (hoje + timedelta(days=[loja.prova_antecedencia_dias or 1, 1]|max)).isoformat() }}"></div>
+          </div>
+          {% endif %}
+          <button type="submit" class="botao-site grande contorno">Comprar · colocar na sacola</button>
+          <p class="suave">Na sacola você escolhe: retirar na loja ou receber em casa.</p>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
+      <div class="acoes-peca">
+        <a class="botao-site grande" href="/site/prova?peca={{ p.slug }}{{ '&data=' ~ data if data }}">Agendar prova</a>
+        {% if zap_peca %}<a class="botao-site contorno grande" href="{{ zap_peca }}" target="_blank" rel="noopener">Falar no WhatsApp</a>{% endif %}
+      </div>
+
+      {% if p.descricao %}<div class="descricao"><h2>Detalhes</h2><p>{{ p.descricao }}</p></div>{% endif %}
+      {% if ocasioes %}
+      <div class="descricao"><h2>Combina com</h2>
+        <p class="chips">{% for o in ocasioes %}<a class="chip" href="/site/c/{{ o.pai_slug ~ '/' ~ o.slug if o.pai_slug else o.slug }}">{{ o.nome }}</a>{% endfor %}</p></div>
+      {% endif %}
+      <details class="descricao">
+        <summary>Como funciona o aluguel</summary>
+        <p>Você agenda a prova, tiramos as medidas e fazemos os ajustes. Na reserva é pedida uma entrada; o restante é pago até a retirada. Depois da festa, é só devolver: a limpeza é por nossa conta.</p>
+      </details>
+    </div>
+  </div>
+
+  {% if parecidas %}
+  <section class="bloco">
+    <h2 class="titulo-bloco">Você também pode gostar</h2>
+    <div class="grade-pecas">{% for x in parecidas %}{{ c.card(x) }}{% endfor %}</div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

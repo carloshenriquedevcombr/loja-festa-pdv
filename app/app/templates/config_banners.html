@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% import "_formulario.html" as f %}
+{% import "_icones.html" as ic %}
+{% block titulo %}Banners e destaques do site{% endblock %}
+{% block conteudo %}
+{{ f.erro_box(erro) }}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+<section class="cartao estreito">
+  <h2>Novo banner de promoção</h2>
+  <p class="suave">Aparece no topo da página inicial do site e gira sozinho (até 6 no ar). Use foto deitada (mín. 1200 px de largura).</p>
+  <form method="post" action="/config/banners" enctype="multipart/form-data" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="titulo">Título <span class="dica">Ex.: Semana das madrinhas — 15% no aluguel</span></label>
+    <input id="titulo" name="titulo" type="text" maxlength="80" value="{{ v.titulo or '' }}">
+    <label for="texto">Frase <span class="dica">Opcional</span></label>
+    <input id="texto" name="texto" type="text" maxlength="160" value="{{ v.texto or '' }}">
+    <label for="botao">Texto do botão <span class="dica">Ex.: Ver vestidos</span></label>
+    <input id="botao" name="botao" type="text" maxlength="30" value="{{ v.botao or '' }}">
+    <label for="link">Para onde o botão leva <span class="dica">Página do site, ex.: /site/colecao ou /site/c/madrinhas</span></label>
+    <input id="link" name="link" type="text" maxlength="200" value="{{ v.link or '' }}">
+    <label for="imagem">Foto <span class="dica">Opcional. Sem foto, usa só a cor</span></label>
+    <input id="imagem" name="imagem" type="file" accept="image/jpeg,image/png,image/webp">
+    <span class="rotulo">Cor</span>
+    <div class="opcoes">{% for c, n in TEMAS.items() %}<label class="opcao"><input type="radio" name="tema" value="{{ c }}" {% if (v.tema or 'escuro') == c %}checked{% endif %}>{{ n }}</label>{% endfor %}</div>
+    <div class="duas-colunas">
+      <div><label for="inicio">Começa em <span class="dica">Opcional</span></label><input id="inicio" name="inicio" type="date" value="{{ v.inicio or '' }}"></div>
+      <div><label for="fim">Termina em <span class="dica">Opcional</span></label><input id="fim" name="fim" type="date" value="{{ v.fim or '' }}"></div>
+    </div>
+    <div class="acoes"><button type="submit" class="botao">✚ PUBLICAR BANNER</button></div>
+  </form>
+</section>
+
+{% if banners %}
+<section class="cartao">
+  <h2>Banners</h2>
+  {% for b in banners %}
+  <form method="post" action="/config/banners/{{ b.id }}" class="bloco-banner {{ '' if b.ativo else 'inativo' }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if b.imagem %}<img src="/fotos/{{ b.imagem }}-480.jpg" alt="" class="miniatura-banner">{% endif %}
+    <div class="duas-colunas">
+      <div><label>Título<input name="titulo" type="text" maxlength="80" value="{{ b.titulo }}"></label></div>
+      <div><label>Frase<input name="texto" type="text" maxlength="160" value="{{ b.texto or '' }}"></label></div>
+      <div><label>Botão<input name="botao" type="text" maxlength="30" value="{{ b.botao or '' }}"></label></div>
+      <div><label>Link<input name="link" type="text" maxlength="200" value="{{ b.link or '' }}"></label></div>
+      <div><label>Começa<input name="inicio" type="date" value="{{ b.inicio or '' }}"></label></div>
+      <div><label>Termina<input name="fim" type="date" value="{{ b.fim or '' }}"></label></div>
+      <div><label>Ordem<input name="ordem" type="number" min="0" max="99" value="{{ b.ordem }}"></label></div>
+      <div><label>Cor<select name="tema">{% for c, n in TEMAS.items() %}<option value="{{ c }}" {% if b.tema == c %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></label></div>
+    </div>
+    <div class="opcoes">
+      <label class="opcao"><input type="radio" name="ativo" value="1" {% if b.ativo %}checked{% endif %}>No ar</label>
+      <label class="opcao"><input type="radio" name="ativo" value="0" {% if not b.ativo %}checked{% endif %}>Fora do ar</label>
+    </div>
+    <div class="acoes"><button type="submit" class="botao claro">✓ GUARDAR</button></div>
+  </form>
+  {% endfor %}
+</section>
+{% endif %}
+
+<section class="cartao" id="destaques">
+  <h2>Os 4 destaques (antes do rodapé do site)</h2>
+  <p class="suave">Ícone, título, frase curta e a página que abre. Os textos das páginas (Como funciona, Entrega e devolução,
+    Perguntas frequentes, Como provar) se editam em <a href="/config/rodape#paginas">Rodapé do site</a>.</p>
+  <form method="post" action="/config/destaques">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="grade-destaques">
+    {% for d in destaques %}{% set n = loop.index %}
+      <fieldset class="destaque-editar">
+        <legend>Destaque {{ n }}</legend>
+        <div class="opcoes icones-escolha">
+          {% for cod, nome in ICONES.items() %}<label class="opcao pequena" title="{{ nome }}"><input type="radio" name="icone{{ n }}" value="{{ cod }}" {% if d.icone == cod %}checked{% endif %}>{{ ic.icone(cod) }}<span class="sr">{{ nome }}</span></label>{% endfor %}
+        </div>
+        <label>Título<input name="titulo{{ n }}" type="text" maxlength="40" value="{{ d.titulo }}"></label>
+        <label>Frase<input name="texto{{ n }}" type="text" maxlength="120" value="{{ d.texto or '' }}"></label>
+        <label>Página<input name="link{{ n }}" type="text" maxlength="200" value="{{ d.link or '' }}"></label>
+      </fieldset>
+    {% endfor %}
+    </div>
+    <div class="acoes"><button type="submit" class="botao">✓ GUARDAR DESTAQUES</button></div>
+  </form>
+</section>
+{% endblock %}

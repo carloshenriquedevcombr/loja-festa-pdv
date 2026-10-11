@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block titulo %}{{ c.nome }}{% endblock %}
+{% block voltar %}/clientes{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {% if nova %}<p class="sucesso">Cliente cadastrada!</p>{% endif %}
+  <div class="tabela-vidro"><table>
+    <tr><td>Telefone</td><td>{{ (c.telefone|telefone) if c.telefone else "—" }}</td></tr>
+    <tr><td>CPF</td><td>{{ (c.cpf|cpf) if c.cpf else "—" }}</td></tr>
+    <tr><td>E-mail</td><td>{{ c.email or "—" }}</td></tr>
+    {% if c.observacoes %}<tr><td>Observações</td><td>{{ c.observacoes }}</td></tr>{% endif %}
+    <tr><td>Autorizou guardar dados</td><td>{{ "Sim" if c.consentimento_lgpd_em else "Ainda não (cadastro feito no pedido)" }}</td></tr>
+  </table></div>
+  <div class="acoes">
+    {% if pode("pedidos.criar") %}<a class="botao" href="/pecas?escolher=1&amp;cliente={{ c.id }}">✚ Novo pedido para ela</a>{% endif %}
+    {% if pode("clientes.editar") %}<a class="botao claro" href="/clientes/{{ c.id }}/editar">✎ Editar dados</a>{% endif %}
+    {% if pode("medidas.ver") %}<a class="botao claro" href="/clientes/{{ c.id }}/medidas">📏 Medidas</a>{% endif %}
+    {% if pedidos and pode("pedidos.ver") %}<a class="botao claro" href="/clientes/{{ c.id }}/extrato">🖨 Extrato da cliente</a>{% endif %}
+  </div>
+</section>
+
+{% if ultimas is not none %}
+<section class="cartao estreito">
+  <h2>Medidas</h2>
+  {% for m in ultimas %}
+    <p class="suave">Ficha {{ FICHAS[m.ficha].nome|lower }} · {{ m.quando }} · {{ m.quem }}</p>
+    <ul class="valores-medida">
+      {% for n, chave, nome, dica, minimo, maximo, costas in FICHAS[m.ficha].pontos if chave in m.valores %}
+        <li><span class="num-medida pequeno">{{ n }}</span> {{ nome }} <strong>{{ numero(m.valores[chave]) }} cm</strong></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="vazio">Nenhuma medida ainda.</p>
+  {% endfor %}
+  <div class="acoes compacta"><a class="botao claro pequeno" href="/clientes/{{ c.id }}/medidas">📏 Abrir a ficha de medidas</a></div>
+</section>
+{% endif %}
+
+<section class="cartao estreito">
+  <h2>Pedidos ({{ pedidos|length }})</h2>
+  <div class="lista">
+  {% for p in pedidos %}
+    <a class="item" {% if pode("pedidos.ver") %}href="/pedidos/{{ p.id }}"{% endif %}>
+      <span class="sku">{{ p.sku }}</span>
+      <span class="principal"><span class="titulo-item">{{ tipo_nome(p) }} · {{ p.peca }}</span><br>
+        <span class="suave">Feito em {{ p.criado|data }}{% if p.data_retirada %} · retirada {{ p.data_retirada|data }}{% endif %} · {{ p.valor_total_centavos|brl }}</span></span>
+      <span class="selo info">{{ STATUS[p.status] }}</span>
+      {% if p.saldo > 0 and p.status != "CANCELADO" %}<span class="selo alerta">Falta {{ p.saldo|brl }}</span>{% endif %}
+    </a>
+  {% else %}
+    <p>Nenhum pedido ainda.</p>
+  {% endfor %}
+  </div>
+</section>
+{% endblock %}

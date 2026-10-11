@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block titulo %}Pedidos{% endblock %}
+{% block conteudo %}
+<section class="cartao">
+  <form method="get" action="/pedidos">
+    <div class="opcoes">
+      {% for valor, nome in [("ativos", "Em andamento"), ("hoje", "Entregar/receber hoje"), ("atrasados", "Devolução atrasada"), ("site", "Do site"), ("todos", "Todos")] %}
+        <label class="opcao"><input type="radio" name="filtro" value="{{ valor }}" {% if filtro == valor %}checked{% endif %}>{{ nome }}</label>
+      {% endfor %}
+    </div>
+    <label for="q">Cliente ou código da peça</label>
+    <input id="q" name="q" type="search" value="{{ q }}" autocomplete="off">
+    <div class="acoes"><button type="submit" class="botao">⌕ MOSTRAR</button>
+      {% if pode("pedidos.criar") %}<a class="botao claro" href="/pedidos/novo">✚ Novo pedido</a>{% endif %}</div>
+  </form>
+</section>
+<div class="lista">
+{% for pe in pedidos %}
+  <a class="item" href="/pedidos/{{ pe.id }}">
+    <span class="sku">{{ pe.sku }}</span>
+    <span class="principal"><span class="titulo-item">{{ pe.cliente or "Venda no balcão" }}</span><br>
+      <span class="suave">{{ pe.peca }}{% if pe.data_retirada %} · retirada {{ pe.data_retirada|data }}{% endif %}{% if pe.data_devolucao %} · devolução {{ pe.data_devolucao|data }}{% endif %}</span></span>
+    {% if pe.atrasado %}<span class="selo alerta">Devolução atrasada</span>{% endif %}
+    {% if pe.do_site %}<span class="selo neutro">🛍 Site · {{ {"RETIRADA": "retira", "LOCAL": "entregar", "ENVIO": "enviar"}[pe.do_site] }}</span>{% endif %}
+    <span class="selo info">{{ STATUS[pe.status] }}</span>
+    {% if pe.saldo > 0 and pe.status != "CANCELADO" %}<span class="selo alerta">Falta {{ pe.saldo|brl }}</span>{% endif %}
+  </a>
+{% else %}
+  <div class="cartao"><p>Nenhum pedido aqui.</p></div>
+{% endfor %}
+</div>
+{% endblock %}

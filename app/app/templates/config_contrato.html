@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block titulo %}Texto do contrato{% endblock %}
+{% block voltar %}/config{% endblock %}
+{% block conteudo %}
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+<section class="cartao">
+  <p class="suave">Este é o contrato que a cliente assina na tela. Os <strong>campos entre chaves</strong> são trocados pelos dados do pedido.
+     Contratos já assinados <strong>não mudam</strong>: cada um guarda o texto do dia em que foi assinado.
+     <strong>Peça para um advogado revisar o texto.</strong></p>
+  <form method="post" action="/config/contrato">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="texto">Texto do contrato</label>
+    <textarea id="texto" name="texto" rows="22" maxlength="30000" class="texto-longo">{{ texto }}</textarea>
+    <div class="acoes">
+      <button type="submit" name="acao" value="previa" class="botao claro">👁 VER PRÉVIA</button>
+      <button type="submit" name="acao" value="salvar" class="botao">✓ SALVAR CONTRATO</button>
+    </div>
+  </form>
+  <form method="post" action="/config/contrato"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="padrao" value="1">
+    <button type="submit" class="botao claro pequeno">Voltar ao modelo padrão</button></form>
+</section>
+<section class="cartao">
+  <h2>Campos que pode usar</h2>
+  <ul class="lista-campos">{% for c, d in campos.items() %}<li><code>{{ "{" ~ c ~ "}" }}</code> {{ d }}</li>{% endfor %}</ul>
+</section>
+{% if previa %}
+<section class="cartao">
+  <h2>Prévia com um pedido de exemplo</h2>
+  <div class="contrato-texto">{{ previa }}</div>
+</section>
+{% endif %}
+{% if versoes %}
+<section class="cartao">
+  <h2>Histórico</h2>
+  <ul class="linha-tempo">{% for v in versoes %}<li>{{ v.quando }} · {{ v.nome }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}

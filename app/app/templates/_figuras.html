@@ -1,0 +1,68 @@
+{# Desenhos da ficha de medidas: frente e costas, com os pontos numerados.
+   Cada ponto tem a classe p-<chave>: quando a costureira clica no campo, o número acende no desenho. #}
+
+{% macro marca(n, chave, x, y) %}<g class="marca-medida p-{{ chave }}"><circle cx="{{ x }}" cy="{{ y }}" r="10"/><text x="{{ x }}" y="{{ y + 4 }}" text-anchor="middle">{{ n }}</text></g>{% endmacro %}
+{% macro linha(chave, x1, y1, x2, y2, costas=False) %}<line class="linha-medida p-{{ chave }}{{ ' costas' if costas }}" x1="{{ x1 }}" y1="{{ y1 }}" x2="{{ x2 }}" y2="{{ y2 }}"/>{% endmacro %}
+{% macro guia(x1, y1, x2, y2) %}<line class="linha-guia" x1="{{ x1 }}" y1="{{ y1 }}" x2="{{ x2 }}" y2="{{ y2 }}"/>{% endmacro %}
+
+{% macro corpo_feminino() %}
+  <ellipse class="corpo" cx="150" cy="34" rx="17" ry="21"/>
+  <path class="corpo" d="M142 52 L142 68 L158 68 L158 52 Z"/>
+  <path class="corpo" d="M108 76 C96 92 92 140 88 190 L84 250 L94 252 L98 192 C102 150 106 124 114 100 Z"/>
+  <path class="corpo" d="M192 76 C204 92 208 140 212 190 L216 250 L206 252 L202 192 C198 150 194 124 186 100 Z"/>
+  <path class="corpo" d="M142 66 L108 76 Q112 90 114 100 Q104 112 110 124 Q118 148 122 165 Q104 186 106 208 L116 318 L128 420 L122 432 L142 432 L142 420 L144 318 L150 245 L156 318 L158 420 L158 432 L178 432 L172 420 L184 318 L194 208 Q196 186 178 165 Q182 148 190 124 Q196 112 186 100 Q188 90 192 76 L158 66 Z"/>
+{% endmacro %}
+
+{% macro corpo_masculino() %}
+  <ellipse class="corpo" cx="150" cy="35" rx="17" ry="22"/>
+  <path class="corpo" d="M141 54 L141 68 L159 68 L159 54 Z"/>
+  <path class="corpo" d="M100 78 C88 96 86 150 84 200 L80 256 L92 258 L98 200 C100 160 102 130 106 118 Z"/>
+  <path class="corpo" d="M200 78 C212 96 214 150 216 200 L220 256 L208 258 L202 200 C200 160 198 130 194 118 Z"/>
+  <path class="corpo" d="M141 66 L100 78 L106 118 L116 170 L110 205 L114 322 L122 432 L144 432 L146 322 L150 250 L154 322 L156 432 L178 432 L186 322 L190 205 L184 170 L194 118 L200 78 L159 66 Z"/>
+{% endmacro %}
+
+{% macro figura(ficha) %}
+<svg class="figura-medidas" viewBox="0 0 560 450" role="img"
+     aria-label="Desenho do corpo {{ 'masculino' if ficha == 'MASCULINO' else 'feminino' }} com os pontos de medida numerados">
+  <text class="legenda-figura" x="150" y="448" text-anchor="middle">FRENTE</text>
+  <text class="legenda-figura" x="420" y="448" text-anchor="middle">COSTAS</text>
+  <line class="chao" x1="20" y1="433" x2="540" y2="433"/>
+  {% if ficha == "MASCULINO" %}
+    {{ corpo_masculino() }}
+    <g transform="translate(270 0)">{{ corpo_masculino() }}</g>
+    {{ linha("colarinho", 140, 62, 160, 62) }}{{ guia(160, 62, 176, 62) }}{{ marca(7, "colarinho", 186, 62) }}
+    {{ linha("torax", 104, 118, 196, 118) }}{{ guia(196, 118, 236, 118) }}{{ marca(1, "torax", 246, 118) }}
+    {{ linha("cintura", 116, 170, 184, 170) }}{{ guia(184, 170, 236, 170) }}{{ marca(2, "cintura", 246, 170) }}
+    {{ linha("quadril", 110, 205, 190, 205) }}{{ guia(190, 205, 236, 205) }}{{ marca(3, "quadril", 246, 205) }}
+    {{ linha("manga", 206, 80, 228, 254) }}{{ marca(5, "manga", 238, 240) }}
+    {{ linha("coxa", 112, 262, 147, 262) }}{{ guia(62, 262, 112, 262) }}{{ marca(10, "coxa", 52, 262) }}
+    {{ linha("entrepernas", 150, 252, 150, 432) }}{{ marca(9, "entrepernas", 150, 350) }}
+    {{ linha("calca", 262, 170, 262, 432) }}{{ guia(184, 170, 262, 170) }}{{ marca(8, "calca", 262, 380) }}
+    {{ linha("altura", 36, 13, 36, 432) }}{{ marca(11, "altura", 36, 300) }}
+    {{ linha("ombro", 370, 78, 470, 78, True) }}{{ marca(4, "ombro", 486, 70) }}
+    {{ linha("paleto", 420, 66, 420, 262, True) }}{{ marca(6, "paleto", 420, 160) }}
+  {% else %}
+    {{ corpo_feminino() }}
+    <g transform="translate(270 0)">{{ corpo_feminino() }}</g>
+    {{ linha("pescoco", 141, 60, 159, 60) }}{{ guia(159, 60, 172, 60) }}{{ marca(13, "pescoco", 182, 58) }}
+    {{ linha("ombros", 108, 76, 192, 76) }}{{ guia(192, 76, 236, 70) }}{{ marca(9, "ombros", 246, 68) }}
+    {{ linha("busto", 110, 122, 190, 122) }}{{ guia(190, 122, 236, 122) }}{{ marca(3, "busto", 246, 122) }}
+    {{ linha("separacao_busto", 136, 132, 164, 132) }}{{ guia(62, 136, 136, 132) }}{{ marca(6, "separacao_busto", 52, 136) }}
+    {{ linha("altura_busto", 136, 78, 136, 120) }}{{ guia(62, 98, 136, 98) }}{{ marca(5, "altura_busto", 52, 98) }}
+    {{ linha("frente", 150, 68, 150, 165) }}{{ marca(4, "frente", 150, 146) }}
+    {{ linha("cintura", 122, 165, 178, 165) }}{{ guia(178, 165, 236, 165) }}{{ marca(1, "cintura", 246, 165) }}
+    {{ linha("quadril", 106, 208, 194, 208) }}{{ guia(194, 208, 236, 208) }}{{ marca(2, "quadril", 246, 208) }}
+    {{ linha("altura_quadril", 116, 167, 116, 206) }}{{ guia(62, 186, 116, 186) }}{{ marca(16, "altura_quadril", 52, 186) }}
+    {{ linha("contorno_braco", 197, 140, 209, 140) }}{{ guia(209, 140, 236, 144) }}{{ marca(11, "contorno_braco", 246, 144) }}
+    {{ linha("braco", 100, 78, 78, 250) }}{{ marca(10, "braco", 72, 212) }}
+    {{ linha("punho", 84, 246, 95, 246) }}{{ guia(62, 250, 84, 247) }}{{ marca(12, "punho", 52, 252) }}
+    {{ linha("gancho", 150, 167, 150, 243) }}{{ marca(15, "gancho", 150, 222) }}
+    {{ linha("joelho", 176, 167, 176, 318) }}{{ marca(17, "joelho", 176, 290) }}
+    {{ linha("comprimento_saia", 226, 165, 226, 432) }}{{ marca(14, "comprimento_saia", 226, 360) }}
+    {{ linha("comprimento_vestido", 266, 76, 266, 432) }}{{ marca(19, "comprimento_vestido", 266, 300) }}
+    {{ linha("altura", 30, 13, 30, 432) }}{{ marca(18, "altura", 30, 330) }}
+    {{ linha("costas", 420, 60, 420, 165, True) }}{{ marca(7, "costas", 420, 118) }}
+    {{ linha("largura_costas", 384, 104, 456, 104, True) }}{{ guia(456, 104, 488, 98) }}{{ marca(8, "largura_costas", 498, 96) }}
+  {% endif %}
+</svg>
+{% endmacro %}

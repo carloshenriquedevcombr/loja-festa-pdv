@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% import "_formulario.html" as f %}
+{% block titulo %}Sacola e entrega do site{% endblock %}
+{% block conteudo %}
+{{ f.erro_box(erro) }}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+<section class="cartao estreito">
+  <h2>Sacola do site</h2>
+  <p class="suave">Com a sacola ligada, a cliente aluga (com datas) ou compra pelo site, entra na conta dela e paga no
+    Mercado Pago (Pix ou cartão). O pedido entra sozinho em <a href="/pedidos">Pedidos</a>. A loja nunca vê o cartão.</p>
+  {% if not pagamento_ok %}<p class="aviso">Primeiro ligue o pagamento online em <a href="/config/site">Site e pagamento online</a>.</p>{% endif %}
+  <form method="post" action="/config/entrega">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="opcoes">
+      <label class="opcao"><input type="radio" name="sacola_ativa" value="1" {% if loja.sacola_ativa %}checked{% endif %}>Sacola ligada<small>Botões "Alugar" e "Comprar" nas peças</small></label>
+      <label class="opcao"><input type="radio" name="sacola_ativa" value="0" {% if not loja.sacola_ativa %}checked{% endif %}>Desligada<small>Só "Agendar prova" e WhatsApp</small></label>
+    </div>
+    <span class="rotulo">Aluguel pelo site: quanto a cliente paga na hora?</span>
+    <div class="opcoes">
+      <label class="opcao"><input type="radio" name="sacola_pagamento" value="ENTRADA_OU_TOTAL" {% if loja.sacola_pagamento == "ENTRADA_OU_TOTAL" %}checked{% endif %}>Ela escolhe: entrada ou tudo<small>Entrada pela regra de Configurações</small></label>
+      <label class="opcao"><input type="radio" name="sacola_pagamento" value="TOTAL" {% if loja.sacola_pagamento == "TOTAL" %}checked{% endif %}>Sempre tudo</label>
+    </div>
+    <label for="sacola_minutos">Minutos para pagar <span class="dica">A peça fica segura para ela nesse tempo (15 a 1440)</span></label>
+    <input id="sacola_minutos" name="sacola_minutos" inputmode="numeric" maxlength="4" value="{{ loja.sacola_minutos }}">
+
+    <h2>Entrega</h2>
+    <div class="opcoes">
+      <label class="opcao"><input type="checkbox" name="entrega_retirada" value="1" {% if loja.entrega_retirada %}checked{% endif %}>Retirada na loja</label>
+      <label class="opcao"><input type="checkbox" name="entrega_envio" value="1" {% if loja.entrega_envio %}checked{% endif %}>Envio pelo Melhor Envio<small>Só compra. {{ "Melhor Envio conectado ✓" if tem_token_envio else "Falta o token do Melhor Envio (veja abaixo)" }}</small></label>
+    </div>
+    <label for="cep_origem">CEP da loja (de onde sai o pacote)</label>
+    <input id="cep_origem" name="cep_origem" inputmode="numeric" maxlength="9" value="{{ loja.cep_origem or '' }}">
+    <span class="rotulo">Pacote padrão (para calcular o frete)</span>
+    <div class="duas-colunas">
+      <div><label for="pacote_peso_g">Peso (gramas)</label><input id="pacote_peso_g" name="pacote_peso_g" inputmode="numeric" value="{{ loja.pacote_peso_g }}"></div>
+      <div><label for="pacote_altura_cm">Altura (cm)</label><input id="pacote_altura_cm" name="pacote_altura_cm" inputmode="numeric" value="{{ loja.pacote_altura_cm }}"></div>
+      <div><label for="pacote_largura_cm">Largura (cm)</label><input id="pacote_largura_cm" name="pacote_largura_cm" inputmode="numeric" value="{{ loja.pacote_largura_cm }}"></div>
+      <div><label for="pacote_comprimento_cm">Comprimento (cm)</label><input id="pacote_comprimento_cm" name="pacote_comprimento_cm" inputmode="numeric" value="{{ loja.pacote_comprimento_cm }}"></div>
+    </div>
+    <h2>Compra pelo site com ajuste na loja</h2>
+    <label for="ajuste_site">Valor do ajuste na compra pelo site (R$) <span class="dica">Quando a cliente compra pelo site e quer
+      ajustar na loja (barra, alça…), este valor é somado. Deixe em branco para não oferecer.</span></label>
+    <input id="ajuste_site" name="ajuste_site" inputmode="decimal" placeholder="Ex.: 80,00"
+      value="{{ ('%.2f'|format(loja.ajuste_site_centavos / 100))|replace('.', ',') if loja.ajuste_site_centavos else '' }}">
+    <div class="acoes"><button type="submit" class="botao">✓ GUARDAR</button></div>
+  </form>
+</section>
+
+<section class="cartao estreito" id="melhor-envio">
+  <h2>Melhor Envio (Correios e transportadoras)</h2>
+  {% if me %}
+    <p class="sucesso">Token guardado (termina em …{{ me.token_final }}) em {{ me.quando }}{% if me.sandbox %} · <strong>modo teste (sandbox)</strong>{% endif %}.
+      {% if me.conta %}<br>Conta: <strong>{{ me.conta }}</strong>{% else %}<br>Toque em “Testar conexão” para conferir.{% endif %}</p>
+    <div class="acoes compacta">
+      <form method="post" action="/config/entrega/melhor-envio"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="testar">
+        <button type="submit" class="botao">↻ Testar conexão</button></form>
+      <form method="post" action="/config/entrega/melhor-envio"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="tirar">
+        <button type="submit" class="botao claro">Tirar o token</button></form>
+    </div>
+  {% elif token_no_env %}
+    <p class="suave">Usando o token do servidor (arquivo .env). Se quiser, cole outro abaixo: o daqui vale mais.</p>
+  {% endif %}
+  <details class="guia" {{ "open" if not me }}>
+    <summary>Passo a passo: como pegar o token (5 minutos)</summary>
+    <ol class="passos">
+      <li>Entre em <a href="https://melhorenvio.com.br" target="_blank" rel="noopener">melhorenvio.com.br</a> e crie a conta da loja (é grátis; com CNPJ ou CPF). Confirme o e-mail.</li>
+      <li>Coloque saldo ou cadastre o cartão lá: as etiquetas são pagas no Melhor Envio, não aqui.</li>
+      <li>No painel, clique no seu nome (canto de cima) → <strong>Integrações</strong> → <strong>Permissões de acesso</strong> (ou “Tokens”).</li>
+      <li>Clique em <strong>Gerar novo token</strong>. Nome: <em>Site da loja</em>. Marque as permissões
+        <strong>shipping-calculate</strong> (calcular frete), <strong>shipping-tracking</strong> (rastreio), <strong>users-read</strong>
+        (testar a conexão) e, se quiser gerar etiqueta depois, <strong>cart-read</strong>, <strong>cart-write</strong> e <strong>orders-read</strong>.</li>
+      <li>Copie o token inteiro (é um texto enorme; ele só aparece uma vez) e cole no campo abaixo. Toque em Guardar e depois em Testar conexão.</li>
+      <li>Preencha o <strong>CEP da loja</strong> e o <strong>pacote padrão</strong> acima e marque “Envio pelo Melhor Envio”.</li>
+    </ol>
+    <p class="suave">Quer testar sem gastar? Crie conta em <a href="https://sandbox.melhorenvio.com.br" target="_blank" rel="noopener">sandbox.melhorenvio.com.br</a>,
+      faça o mesmo caminho e marque “Modo teste”. Os nomes dos menus podem mudar um pouco no site do Melhor Envio.</p>
+  </details>
+  <form method="post" action="/config/entrega/melhor-envio" autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="salvar">
+    <label for="token_me">Token do Melhor Envio <span class="dica">Fica guardado cifrado. Ninguém consegue ver de novo, nem a Dona.</span></label>
+    <textarea id="token_me" name="token" rows="3" spellcheck="false" placeholder="eyJ0eXAiOiJKV1QiLCJhbGciOi…"></textarea>
+    <div class="opcoes"><label class="opcao"><input type="checkbox" name="sandbox" value="1">Modo teste (sandbox)<small>Só marque se o token veio do sandbox.melhorenvio.com.br</small></label></div>
+    <div class="acoes"><button type="submit" class="botao">✓ GUARDAR TOKEN</button></div>
+  </form>
+</section>
+
+<section class="cartao" id="cidades">
+  <h2>Entrega na cidade e região (motoboy ou aplicativo)</h2>
+  <p class="suave">Só aparecem para a cliente as cidades desta lista, com o valor que você escolher. Marque "leva aluguel"
+    se o motoboy também entrega (e busca) peça alugada.</p>
+  {% for c in cidades %}
+  <form method="post" action="/config/entrega/cidades/{{ c.id }}" class="bloco-banner {{ '' if c.ativa else 'inativo' }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="duas-colunas">
+      <div><label>Cidade<input name="cidade" type="text" maxlength="80" value="{{ c.cidade }}"></label></div>
+      <div><label>UF<select name="uf">{% for u in UFS %}<option {% if c.uf == u %}selected{% endif %}>{{ u }}</option>{% endfor %}</select></label></div>
+      <div><label>Valor (R$)<input name="valor" inputmode="decimal" value="{{ '%.2f'|format(c.valor_centavos / 100)|replace('.', ',') }}"></label></div>
+      <div><label>Prazo<input name="prazo" type="text" maxlength="60" value="{{ c.prazo or '' }}"></label></div>
+      <div><label>Como<select name="meio"><option value="MOTOBOY" {% if c.meio == "MOTOBOY" %}selected{% endif %}>Motoboy</option><option value="APLICATIVO" {% if c.meio == "APLICATIVO" %}selected{% endif %}>Aplicativo (99, Uber…)</option></select></label></div>
+    </div>
+    <div class="opcoes">
+      <label class="opcao"><input type="checkbox" name="aluguel" value="1" {% if c.aluguel %}checked{% endif %}>Leva aluguel</label>
+      <label class="opcao"><input type="radio" name="ativa" value="1" {% if c.ativa %}checked{% endif %}>Ativa</label>
+      <label class="opcao"><input type="radio" name="ativa" value="0" {% if not c.ativa %}checked{% endif %}>Desligada</label>
+    </div>
+    <div class="acoes"><button type="submit" class="botao claro pequeno">✓ Guardar</button></div>
+  </form>
+  {% endfor %}
+  <form method="post" action="/config/entrega/cidades" class="bloco-banner">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h3>Incluir cidade</h3>
+    <div class="duas-colunas">
+      <div><label>Cidade<input name="cidade" type="text" maxlength="80"></label></div>
+      <div><label>UF<select name="uf"><option value="">—</option>{% for u in UFS %}<option>{{ u }}</option>{% endfor %}</select></label></div>
+      <div><label>Valor (R$)<input name="valor" inputmode="decimal" placeholder="15,00"></label></div>
+      <div><label>Prazo<input name="prazo" type="text" maxlength="60" placeholder="No mesmo dia"></label></div>
+      <div><label>Como<select name="meio"><option value="MOTOBOY">Motoboy</option><option value="APLICATIVO">Aplicativo (99, Uber…)</option></select></label></div>
+    </div>
+    <div class="opcoes"><label class="opcao"><input type="checkbox" name="aluguel" value="1" checked>Leva aluguel</label></div>
+    <div class="acoes"><button type="submit" class="botao">✚ INCLUIR</button></div>
+  </form>
+</section>
+{% endblock %}

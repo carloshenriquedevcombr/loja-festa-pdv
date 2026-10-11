@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block titulo %}Checklist {{ p.sku }} · {{ codigo }}{% endblock %}
+{% block voltar %}/pedidos/{{ p.id }}{% endblock %}
+{% block conteudo %}
+<section class="cartao nao-imprimir">
+  <p>Imprima e prenda no cabide. A ficha acompanha a peça da reserva até a {{ "devolução" if p.tipo == "ALUGUEL" else "entrega" }}.
+     O código de barras abre o pedido no leitor da loja; o QR code abre no celular.</p>
+  <div class="acoes compacta">
+    <button type="button" class="botao" data-imprimir>🖨 IMPRIMIR</button>
+    <a class="opcao {{ 'escolhida' if formato == '10x15' }}" href="?formato=10x15">Etiqueta 10 × 15 cm</a>
+    <a class="opcao {{ 'escolhida' if formato == 'a4' }}" href="?formato=a4">Folha A4</a>
+  </div>
+</section>
+<article class="checklist checklist-{{ formato }}">
+  <header class="ck-topo">
+    <div class="ck-marca">{% set mc = marca() %}{% if mc.logo %}<img src="/marca/{{ mc.logo }}-mono.png" alt="">{% else %}<strong>{{ usuario.loja }}</strong>{% endif %}
+      <div class="ck-titulo">CHECKLIST DA PEÇA</div>
+      <div class="ck-codigo">Pedido <strong>{{ codigo }}</strong></div>
+    </div>
+    <div class="ck-qr">{{ qr }}</div>
+  </header>
+  <div class="ck-barras">{{ barras }}</div>
+  <dl class="ck-dados">
+    <div><dt>Peça</dt><dd><strong>{{ p.sku }}</strong> · {{ p.peca }}{% if p.tamanho %} · tam. {{ p.tamanho }}{% endif %}{% if p.cor %} · {{ p.cor }}{% endif %}</dd></div>
+    <div><dt>Cliente</dt><dd>{{ p.cliente or "Venda no balcão" }}{% if fone_final %} · tel. final {{ fone_final }}{% endif %}</dd></div>
+    <div><dt>Tipo</dt><dd>{{ tipo_nome }} · feito em {{ p.feito }} por {{ p.atendente.split()[0] }}</dd></div>
+    {% if p.data_festa %}<div><dt>Festa</dt><dd>{{ p.data_festa|data }}</dd></div>{% endif %}
+    {% if agenda.PROVA_1 %}<div><dt>1ª prova</dt><dd>{{ agenda.PROVA_1 }}</dd></div>{% endif %}
+    {% if agenda.PROVA_2 %}<div><dt>2ª prova</dt><dd>{{ agenda.PROVA_2 }}</dd></div>{% endif %}
+    {% if p.data_retirada %}<div><dt>Retirada</dt><dd><strong>{{ agenda.RETIRADA or (p.data_retirada|data) }}</strong></dd></div>{% endif %}
+    {% if p.data_devolucao %}<div><dt>Devolução</dt><dd><strong>{{ agenda.DEVOLUCAO or (p.data_devolucao|data) }}</strong></dd></div>{% endif %}
+    <div><dt>Falta pagar</dt><dd>{{ saldo|brl if saldo else "quitado" }}</dd></div>
+  </dl>
+  <ol class="ck-passos">
+    {% for s in passos %}
+    <li class="{{ 'feito' if s.feito }}"><span class="ck-caixa">{{ "✔" if s.feito else "" }}</span>
+      <span class="ck-texto">{{ s.texto }}</span>
+      <span class="ck-visto">{% if s.feito %}{{ s.feito.quando }} {{ (s.feito.quem or "").split()[0] }}{% else %}__/__ ______{% endif %}</span></li>
+    {% endfor %}
+  </ol>
+  <div class="ck-linhas"><strong>Ajustes / observações:</strong><span></span><span></span><span></span></div>
+  <p class="ck-rodape">Não tirar esta ficha do cabide até a {{ "devolução" if p.tipo == "ALUGUEL" else "entrega" }}.</p>
+</article>
+<script src="{{ estatico('imprimir.js') }}" defer></script>
+{% endblock %}

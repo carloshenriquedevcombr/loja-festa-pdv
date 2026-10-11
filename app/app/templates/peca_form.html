@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block titulo %}{{ "Cadastrar roupa" if nova else "Editar " ~ p.sku }}{% endblock %}
+{% block voltar %}{{ "/pecas" if nova else "/pecas/" ~ p.id }}{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+  <form method="post" action="{{ '/pecas/nova' if nova else '/pecas/' ~ p.id ~ '/editar' }}" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if nova %}
+      <input type="hidden" name="chave" value="{{ v.chave }}">
+      <span class="rotulo">O que é?</span>
+      <div class="opcoes">
+        {% for c in categorias %}
+          <label class="opcao"><input type="radio" name="categoria" value="{{ c.id }}" {% if v.categoria|string == c.id|string %}checked{% endif %}>
+            {{ c.nome }}<small>código {{ c.prefixo_sku }}-…</small></label>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p>Código: <span class="sku">{{ p.sku }}</span> <span class="suave">(o código nunca muda)</span></p>
+    {% endif %}
+
+    <label for="nome">Nome da peça <span class="dica">Ex.: Vestido longo azul marinho com brilho</span></label>
+    <input id="nome" name="nome" type="text" maxlength="120" value="{{ v.nome or '' }}">
+    <span class="rotulo">Tamanhos <span class="dica">Marque todos que a peça veste (ex.: P, M e G para peça com ajuste)</span></span>
+    <div class="opcoes tamanhos">
+      {% for t in TAMANHOS %}<label class="opcao pequena"><input type="checkbox" name="tam_{{ t }}" value="1" {% if v.get("tam_" ~ t) == "1" %}checked{% endif %}>{{ t }}</label>{% endfor %}
+    </div>
+    <div class="opcoes tamanhos">
+      {% for t in TAMANHOS_NUM %}<label class="opcao pequena"><input type="checkbox" name="tam_{{ t }}" value="1" {% if v.get("tam_" ~ t) == "1" %}checked{% endif %}>{{ t }}</label>{% endfor %}
+    </div>
+    <label for="tamanho_outro">Outro tamanho <span class="dica">Opcional. Ex.: 12 anos, 60 (separe com vírgula)</span></label>
+    <input id="tamanho_outro" name="tamanho_outro" type="text" maxlength="40" value="{{ v.tamanho_outro or v.tamanho or '' }}">
+    <label for="cor">Cor</label>
+    <input id="cor" name="cor" type="text" maxlength="40" value="{{ v.cor or '' }}">
+
+    <span class="rotulo">Esta peça é para…</span>
+    <div class="opcoes">
+      {% for valor, nome in [("alugar", "Só alugar"), ("vender", "Só vender"), ("ambos", "Alugar e vender")] %}
+        <label class="opcao"><input type="radio" name="uso" value="{{ valor }}" {% if v.uso == valor %}checked{% endif %}>{{ nome }}</label>
+      {% endfor %}
+    </div>
+    <div class="se-preco-aluguel">
+      <label for="preco_aluguel">Preço do aluguel</label>
+      <input id="preco_aluguel" name="preco_aluguel" class="valor" inputmode="decimal" value="{{ v.preco_aluguel or '' }}">
+    </div>
+    <div class="se-preco-venda">
+      <label for="preco_venda">Preço de venda</label>
+      <input id="preco_venda" name="preco_venda" class="valor" inputmode="decimal" value="{{ v.preco_venda or '' }}">
+    </div>
+    <label for="descricao">Descrição <span class="dica">Aparece no site. Ex.: tecido, decote, detalhes em pedraria</span></label>
+    <textarea id="descricao" name="descricao" maxlength="500">{{ v.descricao or '' }}</textarea>
+
+    <h3 class="secao-form">Para quem é</h3>
+    <div class="opcoes">
+      {% for codigo, nome in PUBLICO.items() %}
+        <label class="opcao"><input type="radio" name="publico" value="{{ codigo }}" {% if v.publico == codigo %}checked{% endif %}>{{ nome }}</label>
+      {% endfor %}
+    </div>
+    <div class="opcoes espaco">
+      {% for codigo, nome in FAIXA.items() %}
+        <label class="opcao"><input type="radio" name="faixa" value="{{ codigo }}" {% if v.faixa == codigo %}checked{% endif %}>{{ nome }}</label>
+      {% endfor %}
+    </div>
+    <span class="rotulo">Comprimento <span class="dica">Opcional. Para vestidos e saias.</span></span>
+    <div class="opcoes">
+      <label class="opcao"><input type="radio" name="comprimento" value="" {% if not v.comprimento %}checked{% endif %}>Não se aplica</label>
+      {% for codigo, nome in COMPRIMENTO.items() %}
+        <label class="opcao"><input type="radio" name="comprimento" value="{{ codigo }}" {% if v.comprimento == codigo %}checked{% endif %}>{{ nome }}</label>
+      {% endfor %}
+    </div>
+
+    <h3 class="secao-form">Ocasiões <span class="dica">Marque todas em que a peça fica bem. É por aqui que a cliente acha no site.</span></h3>
+    {% for g in grupos %}
+      <span class="rotulo">{{ g.nome }}</span>
+      <div class="opcoes">
+        {% for o in g.filhos %}
+          <label class="opcao"><input type="checkbox" name="ocasiao_{{ o.id }}" value="1" {% if v.get("ocasiao_" ~ o.id) == "1" %}checked{% endif %}>{{ o.nome }}</label>
+        {% endfor %}
+        {% if not g.filhos %}
+          <label class="opcao"><input type="checkbox" name="ocasiao_{{ g.id }}" value="1" {% if v.get("ocasiao_" ~ g.id) == "1" %}checked{% endif %}>{{ g.nome }}</label>
+        {% endif %}
+      </div>
+    {% endfor %}
+    <label for="ocasiao_principal">Ocasião principal no site <span class="dica">A peça aparece com a foto só nesta ocasião em "Escolha pela ocasião" (nas outras marcadas ela continua na busca)</span></label>
+    <select id="ocasiao_principal" name="ocasiao_principal">
+      <option value="">— A primeira marcada —</option>
+      {% for g in grupos %}{% if g.filhos %}<optgroup label="{{ g.nome }}">{% for o in g.filhos %}<option value="{{ o.id }}" {% if v.ocasiao_principal == o.id|string %}selected{% endif %}>{{ o.nome }}</option>{% endfor %}</optgroup>
+      {% else %}<option value="{{ g.id }}" {% if v.ocasiao_principal == g.id|string %}selected{% endif %}>{{ g.nome }}</option>{% endif %}{% endfor %}
+    </select>
+
+    <h3 class="secao-form">No site da loja</h3>
+    <div class="opcoes largas">
+      <label class="opcao"><input type="checkbox" name="no_site" value="1" {% if v.no_site == "1" %}checked{% endif %}>Mostrar esta peça no site<small>Aparece com as fotos na vitrine</small></label>
+      <label class="opcao"><input type="checkbox" name="preco_no_site" value="1" {% if v.preco_no_site == "1" %}checked{% endif %}>Mostrar o preço no site<small>Desmarcado: aparece "Sob consulta"</small></label>
+    </div>
+
+    <div class="acoes"><button type="submit" class="botao">{{ "✓ CADASTRAR E IR PARA AS FOTOS" if nova else "✓ SALVAR" }}</button></div>
+  </form>
+</section>
+{% endblock %}

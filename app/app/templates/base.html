@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf" content="{{ csrf }}">
+  <meta name="theme-color" content="#f6f2ec">
+  <meta name="color-scheme" content="light dark">
+  {% block cabeca %}{% endblock %}
+  <title>{% block titulo %}Loja{% endblock %}</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icone-32.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <script src="{{ estatico('tema.js') }}"></script>
+  <link rel="stylesheet" href="{{ estatico('app.css') }}">
+</head>
+{% import "_icones.html" as ic %}
+<body class="{{ 'com-menu' if usuario else 'sem-menu' }}"{% if usuario %} data-presenca="/presenca"{% endif %}>
+{% if usuario %}
+  <input type="checkbox" id="abrir-lateral" class="alternador-lateral" aria-label="Mostrar o menu">
+  <aside class="lateral" aria-label="Menu do sistema">
+    {% set mc = marca() %}
+    <button type="button" class="botao-encolher" data-encolher-menu aria-label="Encolher ou abrir o menu" data-dica="Encolher o menu (só os ícones) ou abrir de novo. A escolha fica guardada neste aparelho.">{{ ic.icone("setas", "ic-encolher") }}</button>
+    <a class="lateral-marca" href="/">{% if mc.logo %}<img src="/marca/{{ mc.logo }}-logo.png" alt="{{ usuario.loja }}">{% else %}<span>{{ usuario.loja }}</span>{% endif %}</a>
+    <div class="lateral-usuario">
+      <span class="avatar" aria-hidden="true">{{ usuario.nome[:1]|upper }}</span>
+      <span class="lateral-quem"><strong>{{ usuario.nome }}</strong><small><span class="ponto-online" aria-hidden="true"></span>{{ (usuario.papeis|join(", "))|replace("Diretoria: ", "") }}</small></span>
+    </div>
+    <nav class="lateral-menu">
+      <a class="menu-item {{ 'ativo' if menu_ativo == '/' }}" href="/" data-dica="Painel — tela inicial: números do dia, gráficos, agenda e quem está online.">{{ ic.icone("painel", "ic-menu") }}<span>Painel</span></a>
+      {% for titulo, itens in menu_secoes %}
+        <p class="lateral-grupo">{{ titulo }}</p>
+        {% for perms, rotulo, icone, url, estilo in itens %}
+          <a class="menu-item {{ 'ativo' if menu_ativo == url }}" href="{{ url }}" data-dica="{{ rotulo }} — {{ dica_botao(url) }}">{{ ic.icone(icone, "ic-menu") }}<span>{{ rotulo }}</span></a>
+        {% endfor %}
+      {% endfor %}
+    </nav>
+  </aside>
+  <label for="abrir-lateral" class="lateral-fundo" aria-hidden="true"></label>
+  <div class="area-principal">
+    <header class="barra-topo">
+      <label for="abrir-lateral" class="botao-lateral" aria-label="Abrir o menu"><span></span><span></span><span></span></label>
+      {% if request.url.path != "/" %}<a class="botao-voltar" href="{% block voltar %}/{% endblock %}" aria-label="Voltar" data-dica="Voltar para a tela anterior sem gravar nada.">←<span> Voltar</span></a>{% endif %}
+      <div class="barra-titulo">
+        <h1>{% block titulo_pagina %}{{ self.titulo() }}{% endblock %}</h1>
+        <p class="barra-data">{{ agora_texto }}</p>
+      </div>
+      <form class="busca-rapida" method="get" action="/buscar" role="search" data-dica="Digite nome, telefone, CPF, código da peça ou o código do comprovante/QR e aperte Enter. Código do comprovante abre o pedido direto.">
+        <label for="busca-rapida" class="sr">Procurar pedido, cliente ou peça</label>
+        {{ ic.icone("lupa", "ic-busca") }}
+        <input id="busca-rapida" name="q" type="search" placeholder="Procurar pedido, cliente ou peça" autocomplete="off">
+      </form>
+      {% if online_total is not none %}<a class="pilula-online" href="/online" data-dica="Quantas pessoas estão com o sistema ou o site abertos agora. Clique para ver quem e em que tela."><span class="ponto-online" aria-hidden="true"></span>{{ online_total }} online</a>{% endif %}
+      <button type="button" class="botao-tema" data-alternar-tema aria-label="Alternar tema claro ou escuro" data-dica="Tema claro ou escuro. A escolha fica guardada neste aparelho.">{{ ic.icone("lua", "ic-tema lua") }}{{ ic.icone("sol", "ic-tema sol") }}</button>
+      <form method="post" action="/sair" class="form-sair">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="botao claro pequeno" data-dica="Encerrar o acesso neste aparelho. Use sempre que sair do computador da loja.">Sair</button>
+      </form>
+    </header>
+    <main class="tela">{% block conteudo %}{% endblock %}</main>
+  </div>
+  <script src="{{ estatico('presenca.js') }}" defer></script>
+{% else %}
+  <main class="tela">{{ self.conteudo() }}</main>
+{% endif %}
+  <script src="{{ estatico('sistema.js') }}" defer></script>
+  <script src="{{ estatico('dicas.js') }}" defer></script>
+</body>
+</html>

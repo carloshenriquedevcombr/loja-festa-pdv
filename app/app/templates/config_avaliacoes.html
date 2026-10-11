@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block titulo %}Avaliações das clientes{% endblock %}
+{% block conteudo %}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+<section class="cartao">
+  <p>Depois da devolução (aluguel) ou da entrega (venda), a cliente recebe no WhatsApp um link para avaliar.
+     <strong>Nada vai para o site sem você aprovar.</strong> A avaliação da cliente não pode ser editada — só aprovada, recusada ou respondida.</p>
+  <div class="acoes compacta">
+    {% for s, n in [("PENDENTE", "Esperando aprovação"), ("APROVADA", "No site"), ("RECUSADA", "Recusadas")] %}
+    <a class="opcao {{ 'escolhida' if ver == s }}" href="?ver={{ s }}">{{ n }} ({{ contagem.get(s, 0) }})</a>{% endfor %}
+  </div>
+</section>
+<div class="lista">
+{% for a in lista %}
+  <section class="cartao">
+    <p><span class="estrelas-sistema" aria-label="{{ a.nota }} de 5">{{ "★" * a.nota }}{{ "☆" * (5 - a.nota) }}</span>
+       <strong>{{ a.nome_exibicao }}</strong> · {{ a.quando }} · <a href="/pedidos/{{ a.pedido_id }}"><span class="sku">{{ a.sku }}</span></a>
+       {% if a.cliente %}<span class="suave">({{ a.cliente }})</span>{% endif %}</p>
+    {% if a.texto %}<blockquote class="citacao">{{ a.texto }}</blockquote>{% else %}<p class="suave">Sem comentário, só a nota.</p>{% endif %}
+    {% if not a.autoriza_site %}<p class="suave">A cliente <strong>não autorizou</strong> mostrar no site (fica só para a loja).</p>{% endif %}
+    <form method="post" action="/config/avaliacoes/{{ a.id }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label for="r-{{ a.id }}">Resposta da loja <span class="dica">Opcional. Aparece embaixo do comentário no site</span></label>
+      <input id="r-{{ a.id }}" name="resposta" type="text" maxlength="400" value="{{ a.resposta or '' }}">
+      <div class="acoes compacta">
+        {% if a.status != "APROVADA" and a.autoriza_site %}<button type="submit" name="acao" value="aprovar" class="botao entrada pequeno">✓ Aprovar e mostrar</button>{% endif %}
+        {% if a.status != "RECUSADA" %}<button type="submit" name="acao" value="recusar" class="botao claro pequeno">✕ Não mostrar</button>{% endif %}
+        <button type="submit" name="acao" value="responder" class="botao claro pequeno">Guardar resposta</button>
+      </div>
+    </form>
+  </section>
+{% else %}
+  <div class="cartao"><p>Nenhuma avaliação aqui.</p></div>
+{% endfor %}
+</div>
+
+{% if pode("site.editar") %}
+<section class="cartao estreito" id="google">
+  <h2>Nota do Google Meu Negócio</h2>
+  {% if tem_chave %}
+    <p class="suave">Com o <strong>Place ID</strong> preenchido, o sistema busca a nota e os 5 comentários mais recentes do Google uma vez por dia{% if loja.atualizado %} (última: {{ loja.atualizado }}){% endif %}.</p>
+  {% else %}
+    <p class="suave">Digite a nota e o número de avaliações que aparecem no seu Google. Para atualizar sozinho todo dia (com os comentários),
+      o técnico coloca a chave da API Google Places no servidor (veja docs/VPS.md).</p>
+  {% endif %}
+  <form method="post" action="/config/google">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="duas-colunas">
+      <div><label for="google_nota">Nota (1 a 5)</label><input id="google_nota" name="google_nota" inputmode="decimal" maxlength="3" value="{{ (loja.google_nota|string)|replace('.', ',') if loja.google_nota else '' }}"></div>
+      <div><label for="google_total">Nº de avaliações</label><input id="google_total" name="google_total" inputmode="numeric" maxlength="7" value="{{ loja.google_total or '' }}"></div>
+    </div>
+    <label for="google_link">Link da loja no Google <span class="dica">Botão "Compartilhar" no Google Maps</span></label>
+    <input id="google_link" name="google_link" type="url" maxlength="300" value="{{ loja.google_link or '' }}">
+    <label for="google_place_id">Place ID <span class="dica">Opcional (só com a chave da API). Começa com ChIJ…</span></label>
+    <input id="google_place_id" name="google_place_id" type="text" maxlength="200" value="{{ loja.google_place_id or '' }}">
+    <div class="opcoes"><label class="opcao"><input type="checkbox" name="avaliacoes_no_site" value="1" {% if loja.avaliacoes_no_site %}checked{% endif %}>Mostrar avaliações no site (antes do rodapé)</label></div>
+    <div class="acoes"><button type="submit" class="botao">✓ GUARDAR</button></div>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block titulo %}Desfazer lançamento{% endblock %}
+{% block voltar %}/caixa{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+  <p class="frase">{{ "Entrada" if t.tipo == "ENTRADA" else "Saída" }} nº {{ t.id }}: <strong>{{ t.valor_centavos|brl }}</strong>
+     {{ EM_FORMA[t.forma_pagamento] }}<br><span class="suave">{{ t.descricao }} · lançado por {{ t.quem }}</span></p>
+  {% if t.desfeito %}
+    <p class="sucesso">Este lançamento já foi desfeito.</p>
+  {% else %}
+    <p>Nada é apagado: o sistema cria um lançamento ao contrário, com o seu nome e o motivo.
+       Quem lançou não pode desfazer o próprio lançamento.</p>
+    <form method="post" action="/caixa/{{ t.id }}/desfazer">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label for="motivo">Por que desfazer?</label>
+      <input id="motivo" name="motivo" type="text" maxlength="150" value="{{ motivo or '' }}">
+      <div class="acoes"><button type="submit" class="botao saida">DESFAZER ESTE LANÇAMENTO</button>
+        <a class="botao claro" href="/caixa">Não, voltar</a></div>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}

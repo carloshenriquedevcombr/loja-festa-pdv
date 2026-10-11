@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block titulo %}Minha senha{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {% if obrigatoria %}<p class="aviso" role="alert">A regra de senha da loja mudou. Crie uma senha nova para continuar usando o sistema.</p>{% endif %}
+  {% if ok %}<p class="sucesso">Senha trocada! Use a nova da próxima vez que entrar.</p>{% endif %}
+  {% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+  <form method="post" action="/minha-senha" novalidate autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="atual">Senha de agora</label>
+    <input id="atual" name="atual" type="password" autocomplete="current-password">
+    <label for="senha">Senha nova <span class="dica">De 8 a 32 caracteres, com letra maiúscula, minúscula, número e símbolo. Ex.: Vestido#Azul7</span></label>
+    <input id="senha" name="senha" type="password" autocomplete="new-password">
+    <label for="senha2">Repita a senha nova</label>
+    <input id="senha2" name="senha2" type="password" autocomplete="new-password">
+    <div class="acoes"><button type="submit" class="botao">✓ TROCAR SENHA</button></div>
+  </form>
+</section>
+{% endblock %}

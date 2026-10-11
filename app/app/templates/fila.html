@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block conteudo %}
+{% for nome, itens in blocos %}
+<section class="cartao">
+  <h2>{{ nome }} ({{ itens|length }})</h2>
+  <div class="lista">
+  {% for it in itens %}
+    <div class="item">
+      <span class="sku">{{ it.sku }}</span>
+      <span class="principal">{% if pode("pedidos.ver") %}<a class="titulo-item" href="/pedidos/{{ it.id }}">{{ it.peca }}</a>{% else %}<span class="titulo-item">{{ it.peca }}</span>{% endif %}<br>
+        <span class="suave">{{ it.cliente or "" }}{% if it.data_retirada %} · retirada {{ it.data_retirada|data }}{% endif %}</span></span>
+      {% if it.dias is not none and it.dias <= 3 and it.status not in ("DEVOLVIDO", "EM_LIMPEZA") %}
+        <span class="selo alerta">{{ "Atrasado" if it.dias < 0 else ("Hoje" if it.dias == 0 else "Faltam " ~ it.dias ~ " dias") }}</span>{% endif %}
+      <span class="selo info">{{ STATUS[it.status] }}</span>
+      {% if it.cliente_id and pode("medidas.ver") and it.status in ("RESERVADO", "PROVA_1", "EM_AJUSTE", "PROVA_2") %}
+        <a class="botao claro pequeno" href="/clientes/{{ it.cliente_id }}/medidas">📏 Medidas</a>{% endif %}
+      {% for e in it.etapas %}
+        <form method="post" action="/pedidos/{{ it.id }}/etapa">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="para" value="{{ e.para }}">
+          <input type="hidden" name="volta" value="{{ request.url.path }}">
+          <button type="submit" class="botao pequeno">{{ e.rotulo }}</button>
+        </form>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p>{{ vazio }}</p>
+  {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

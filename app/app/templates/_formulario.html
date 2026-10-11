@@ -1,0 +1,58 @@
+{# Blocos reutilizados pelas telas de pagamento #}
+{% macro erro_box(erro) %}{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}{% endmacro %}
+
+{% macro escondidos(campos) %}
+  {% for k, val in campos.items() %}<input type="hidden" name="{{ k }}" value="{{ val }}">{% endfor %}
+{% endmacro %}
+
+{% macro pagamento(v, formas, maquininhas, max_parcelas, titulo="Como foi pago?", com_link=False, modo="receber") %}
+  <span class="rotulo">{{ titulo }}</span>
+  <div class="opcoes">
+    {% for codigo, nome in formas.items() %}
+      <label class="opcao"><input type="radio" name="forma" value="{{ codigo }}" {% if v.forma == codigo %}checked{% endif %}><span class="icone-forma" aria-hidden="true">{{ {"DINHEIRO": "💵", "PIX": "⚡", "DEBITO": "💳", "CREDITO": "💳", "BOLETO": "▥", "CARNE": "📒", "CREDIARIO": "📒"}.get(codigo, "") }}</span>{{ nome }}</label>
+    {% endfor %}
+    {% if com_link %}
+      <label class="opcao"><input type="radio" name="forma" value="LINK" {% if v.forma == "LINK" %}checked{% endif %}>Link de pagamento<small>Pix ou cartão pelo Mercado Pago (pedido do WhatsApp)</small></label>
+    {% endif %}
+  </div>
+
+  {% if modo != "pagar" %}
+  <div class="se-cartao">
+    <span class="rotulo">Em qual maquininha passou?</span>
+    <div class="opcoes largas">
+      {% for m in maquininhas %}
+        <label class="opcao"><input type="radio" name="maquininha" value="{{ m.id }}" {% if v.maquininha|string == m.id|string %}checked{% endif %}>
+          <span><span class="bolinha cor-{{ m.cor_hex[1:]|upper }}"></span>{{ m.apelido }}</span>
+          <small>{{ "Operadora a definir" if m.operadora == "NAO_IDENTIFICADA" else m.operadora }}</small></label>
+      {% endfor %}
+    </div>
+    <label for="nsu">Número do comprovante (NSU) <span class="dica">Opcional. Está impresso no papelzinho da maquininha.</span></label>
+    <input id="nsu" name="nsu" type="text" inputmode="numeric" maxlength="20" value="{{ v.nsu or '' }}">
+  </div>
+  {% endif %}
+
+  <div class="se-credito">
+    <span class="rotulo">Em quantas vezes no cartão?</span>
+    <div class="opcoes">
+      {% for n in range(1, max_parcelas + 1) %}
+        <label class="opcao"><input type="radio" name="parcelas" value="{{ n }}" {% if (v.parcelas or '1')|string == n|string %}checked{% endif %}>{{ "À vista" if n == 1 else n ~ "x" }}</label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="se-vezes">
+    <span class="rotulo">Em quantas parcelas?</span>
+    <div class="opcoes">
+      {% for n in range(1, 13) %}
+        <label class="opcao"><input type="radio" name="vezes" value="{{ n }}" {% if (v.vezes or '1')|string == n|string %}checked{% endif %}>{{ n ~ "x" }}</label>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if "CREDIARIO" in formas %}
+  <div class="se-crediario">
+    <label for="primeiro_vencimento">Vencimento da 1ª parcela <span class="dica">As outras vencem no mesmo dia dos meses seguintes. A cliente precisa ter CPF no cadastro.</span></label>
+    <input id="primeiro_vencimento" name="primeiro_vencimento" type="date" value="{{ v.primeiro_vencimento or '' }}">
+  </div>
+  {% endif %}
+{% endmacro %}

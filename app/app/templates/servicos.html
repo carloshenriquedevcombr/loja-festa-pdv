@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% import "_formulario.html" as f %}
+{% block titulo %}Serviços avulsos{% endblock %}
+{% block conteudo %}
+{{ f.erro_box(erro) }}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+<section class="cartao">
+  <p>Todo dinheiro que entra sem pedido precisa de um motivo: escolha aqui os serviços que a loja cobra à parte
+    (limpeza de roupa da cliente, conserto, aluguel de acessório, taxa de atraso…). Em <strong>Recebi dinheiro</strong>,
+    a atendente escolhe a cliente e o serviço. Nada é apagado: serviço que não usa mais fica "desligado".</p>
+</section>
+{% for s in itens %}
+<form method="post" action="/servicos/{{ s.id }}" class="cartao bloco-banner {{ '' if s.ativo else 'inativo' }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="duas-colunas">
+    <div><label>Nome<input name="nome" type="text" maxlength="80" value="{{ s.nome }}"></label></div>
+    <div><label>Preço sugerido (R$)<input name="preco" inputmode="decimal" value="{{ ('%.2f'|format(s.preco_centavos / 100))|replace('.', ',') if s.preco_centavos else '' }}"></label></div>
+    <div><label>Explicação<input name="descricao" type="text" maxlength="200" value="{{ s.descricao or '' }}"></label></div>
+  </div>
+  <div class="opcoes">
+    <label class="opcao"><input type="radio" name="ativo" value="1" {% if s.ativo %}checked{% endif %}>Ligado</label>
+    <label class="opcao"><input type="radio" name="ativo" value="0" {% if not s.ativo %}checked{% endif %}>Desligado<small>{{ s.usos }} recebimento(s) no histórico</small></label>
+  </div>
+  <div class="acoes"><button type="submit" class="botao claro pequeno">✓ Guardar</button></div>
+</form>
+{% endfor %}
+<form method="post" action="/servicos" class="cartao estreito">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Novo serviço</h2>
+  <label for="nome">Nome</label><input id="nome" name="nome" type="text" maxlength="80">
+  <label for="preco">Preço sugerido <span class="dica">Opcional</span></label><input id="preco" name="preco" inputmode="decimal">
+  <label for="descricao">Explicação <span class="dica">Opcional</span></label><input id="descricao" name="descricao" type="text" maxlength="200">
+  <div class="acoes"><button type="submit" class="botao">✚ CADASTRAR</button></div>
+</form>
+{% endblock %}

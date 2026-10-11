@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% import "_cargos.html" as c %}
+{% block titulo %}Cadastrar funcionário{% endblock %}
+{% block voltar %}/equipe{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+  <form method="post" action="/equipe/novo" novalidate autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="nome">Nome</label>
+    <input id="nome" name="nome" type="text" maxlength="80" value="{{ v.nome or '' }}">
+    <label for="login">Usuário para entrar <span class="dica">Sem espaço e sem acento. Ex.: ana.silva</span></label>
+    <input id="login" name="login" type="text" maxlength="40" value="{{ v.login or '' }}" autocapitalize="none">
+    <label for="telefone">Telefone <span class="dica">Opcional</span></label>
+    <input id="telefone" name="telefone" type="tel" value="{{ v.telefone or '' }}">
+    <label for="data_admissao">Data de contratação <span class="dica">Opcional</span></label>
+    <input id="data_admissao" name="data_admissao" type="date" value="{{ v.data_admissao or '' }}">
+    {% set marcados = [] %}{% for p in papeis %}{% if v.get("papel_" ~ p.codigo) == "1" %}{% set _ = marcados.append(p.codigo) %}{% endif %}{% endfor %}
+    {{ c.cargos(papeis, marcados, v) }}
+    <label for="senha">Senha inicial <span class="dica">De 8 a 32, com maiúscula, minúscula, número e símbolo. Ex.: Loja@2026. Passe para a pessoa e peça para ela trocar depois.</span></label>
+    <input id="senha" name="senha" type="password" autocomplete="new-password">
+    <label for="senha2">Repita a senha</label>
+    <input id="senha2" name="senha2" type="password" autocomplete="new-password">
+    <div class="acoes"><button type="submit" class="botao">✓ CADASTRAR</button></div>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% import "_formulario.html" as f %}
+{% block titulo %}Confira o pedido{% endblock %}
+{% block voltar %}/pecas/{{ p.id }}{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  <p class="frase">
+    <strong>{{ TIPOS[d.tipo] }}</strong>: <span class="sku">{{ p.sku }}</span> {{ p.nome }}
+    {% if d.cliente_nome %}<br>para <strong>{{ d.cliente_nome }}</strong>{% endif %}.
+    {% if d.tipo == "ALUGUEL" %}<br>Retira em <strong>{{ d.data_retirada|data }}</strong> e devolve em <strong>{{ d.data_devolucao|data }}</strong>.
+    {% elif d.tipo == "VENDA_AJUSTE" %}<br>Retira em <strong>{{ d.data_retirada|data }}</strong>, depois das provas.{% endif %}
+  </p>
+  <div class="tabela-vidro"><table>
+    <tr><td>{{ "Aluguel" if d.tipo == "ALUGUEL" else "Peça" }}</td><td class="num">{{ d.valor_peca|brl }}</td></tr>
+    {% if d.valor_ajuste %}<tr><td>Ajuste</td><td class="num">{{ d.valor_ajuste|brl }}</td></tr>{% endif %}
+    <tr><th>Total</th><th class="num">{{ d.total|brl }}</th></tr>
+    {% if d.link %}
+    <tr><td>Vai pagar pelo link (Pix ou cartão)</td><td class="num">{{ d.valor_link|brl }}</td></tr>
+    <tr><th>Depois do link, falta até a retirada</th><th class="num">{{ (d.total - d.valor_link)|brl }}</th></tr>
+    {% else %}
+    <tr><td>Paga hoje ({{ d.pag.frase() }})</td><td class="num">{{ d.pag.valor|brl }}</td></tr>
+    <tr><th>{{ "Falta pagar até a retirada" if d.falta else "Quitado" }}</th><th class="num">{{ d.falta|brl }}</th></tr>
+    {% endif %}
+  </table></div>
+  {% if d.agenda %}
+  <h3>Agenda</h3>
+  <ul class="linha-tempo">
+    <li>Hoje · <strong>Contratação</strong></li>
+    {% for tipo, dia, hora in d.agenda %}<li>{{ dia|data }} às {{ hora.strftime("%H:%M") }} · <strong>{{ COMPROMISSOS[tipo] }}</strong></li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% if d.inicio_bloqueio %}<p class="suave">A peça fica reservada para ela a partir de {{ d.inicio_bloqueio|data }}.</p>{% endif %}
+  {% if d.link %}<p class="instrucao">🔗 Ao guardar, o sistema cria o link de pagamento. A peça fica guardada por 48 horas esperando o pagamento.</p>{% endif %}
+  {% if d.pag and d.pag.instrucao_maquininha() %}<p class="instrucao">💳 {{ d.pag.instrucao_maquininha() }}</p>{% endif %}
+  <p class="grande">Está certo?</p>
+  <div class="acoes">
+    <form method="post" action="/pedidos/novo/gravar">
+      <input type="hidden" name="csrf" value="{{ csrf }}">{{ f.escondidos(campos) }}
+      <button type="submit" class="botao entrada cheio">✓ SIM, GUARDAR PEDIDO</button>
+    </form>
+    <form method="post" action="/pedidos/novo">
+      <input type="hidden" name="csrf" value="{{ csrf }}">{{ f.escondidos(campos) }}
+      <button type="submit" class="botao claro cheio">✎ CORRIGIR</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

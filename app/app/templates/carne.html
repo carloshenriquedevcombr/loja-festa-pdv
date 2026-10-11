@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block titulo %}Carnê · {{ c.cliente }}{% endblock %}
+{% block voltar %}/crediario/{{ c.id }}{% endblock %}
+{% block conteudo %}
+<section class="cartao nao-imprimir">
+  <p>{{ folhas|length }} parcela{{ "s" if folhas|length != 1 }} em aberto.
+    {% if formato == "80" %}Impressora térmica (bobina de 80 mm): sai um canhoto por parcela, é só destacar.
+    {% else %}Folha A4 (3 parcelas por folha): imprima, recorte na linha pontilhada e entregue à cliente.{% endif %}
+    Cada parcela tem o seu código: passe no leitor ou digite na busca do topo para abrir a parcela e receber.
+    {% if not tem_pix %}<br><strong>Sem chave Pix cadastrada:</strong> o carnê sai sem o QR do Pix. Cadastre em <a href="/crediario">Crediário</a>.{% endif %}</p>
+  <p class="rotulo-grupo">Impressora</p>
+  <div class="acoes compacta">
+    <a class="opcao {{ 'escolhida' if formato == 'a4' }}" href="?formato=a4&amp;codigo={{ codigo }}" data-dica="Impressora comum, folha A4. Sai 3 parcelas por folha para recortar.">📄 Folha A4</a>
+    <a class="opcao {{ 'escolhida' if formato == '80' }}" href="?formato=80&amp;codigo={{ codigo }}" data-dica="Impressora térmica de cupom (bobina 80 mm). Um canhoto por parcela.">🧾 Térmica 80 mm</a>
+  </div>
+  <p class="rotulo-grupo">Código de cada parcela</p>
+  <div class="acoes compacta">
+    <a class="opcao {{ 'escolhida' if codigo == 'barras' }}" href="?formato={{ formato }}&amp;codigo=barras" data-dica="Código de barras com os números embaixo. Serve para leitor de código de barras ou para digitar.">▮▯▮ Código de barras</a>
+    <a class="opcao {{ 'escolhida' if codigo == 'qr' }}" href="?formato={{ formato }}&amp;codigo=qr" data-dica="QR code com o código da parcela (os números saem embaixo também).">▣ QR code</a>
+  </div>
+  <div class="acoes"><button type="button" class="botao" data-imprimir>🖨 IMPRIMIR CARNÊ</button></div>
+</section>
+<div class="carne carne-{{ formato }}">
+  {% for p in folhas %}
+  <article class="carne-folha">
+    <div class="carne-canhoto">
+      <div class="carne-loja">{{ loja.nome }}</div>
+      <div>Parcela <strong>{{ p.numero }}/{{ c.parcelas }}</strong></div>
+      <div>Venc. <strong>{{ p.vencimento|data }}</strong></div>
+      <div>Valor <strong>{{ p.valor_centavos|brl }}</strong></div>
+      <div class="carne-cliente">{{ c.cliente }}</div>
+      <div class="carne-cod-mini">Cód. {{ p.codigo }}</div>
+      <div class="carne-visto">Pago em __/__/____<br>Visto ______</div>
+    </div>
+    <div class="carne-corpo">
+      <header class="carne-topo">{% set mc = marca() %}{% if mc.logo %}<img src="/marca/{{ mc.logo }}-mono.png" alt="">{% else %}<strong>{{ loja.nome }}</strong>{% endif %}
+        <span>CARNÊ DE PAGAMENTO{% if loja.telefone %} · {{ loja.telefone }}{% endif %}</span></header>
+      <dl class="carne-dados">
+        <div><dt>Cliente</dt><dd>{{ c.cliente }}</dd></div>
+        {% if c.sku %}<div><dt>Pedido</dt><dd>{{ c.sku }} · {{ c.peca }}</dd></div>{% endif %}
+        <div><dt>Parcela</dt><dd><strong>{{ p.numero }} de {{ c.parcelas }}</strong></dd></div>
+        <div><dt>Vencimento</dt><dd><strong>{{ p.vencimento|data }}</strong></dd></div>
+        <div><dt>Valor</dt><dd class="carne-valor">{{ p.valor_centavos|brl }}</dd></div>
+      </dl>
+      <div class="carne-codigo carne-codigo-{{ codigo }}">
+        {{ p.marca_codigo }}
+        <div class="carne-numeros">{{ p.codigo }}</div>
+      </div>
+      {% if p.qr %}
+      <div class="carne-pix"><div class="carne-qr">{{ p.qr }}</div>
+        <div><strong>Pague com Pix:</strong> abra o app do banco, escolha “Pix → Ler QR Code” ou “Copia e cola”.
+          <div class="carne-copia">{{ p.pix }}</div></div></div>
+      {% else %}
+      <p class="carne-aviso">Pague na loja em dinheiro, Pix ou cartão. Leve este carnê.</p>
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</div>
+<script src="{{ estatico('imprimir.js') }}" defer></script>
+{% endblock %}

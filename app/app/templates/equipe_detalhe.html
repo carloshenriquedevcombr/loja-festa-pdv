@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% import "_cargos.html" as c %}
+{% block titulo %}{{ p.nome }}{% endblock %}
+{% block voltar %}/equipe{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {% if novo %}<p class="sucesso">Funcionário cadastrado! Ele já pode entrar com o usuário <strong>{{ p.login }}</strong>.</p>{% endif %}
+  {% if ok %}<p class="sucesso">{{ ok }}</p>{% endif %}
+  {% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+  {% if bloqueio %}<p class="aviso">{{ bloqueio }}</p>{% endif %}
+  <p>Usuário: <strong>{{ p.login }}</strong> ·
+    {% if not p.ativo %}<span class="selo neutro">Desativado</span>{% elif p.bloqueado %}<span class="selo alerta">Bloqueado por senha errada</span>{% else %}<span class="selo ok">Ativo</span>{% endif %}</p>
+
+  <form method="post" action="/equipe/{{ p.id }}/dados" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="nome">Nome</label>
+    <input id="nome" name="nome" type="text" maxlength="80" value="{{ p.nome }}" {% if bloqueio %}disabled{% endif %}>
+    <label for="telefone">WhatsApp <span class="dica">Recebe os avisos e o código de entrada</span></label>
+    <input id="telefone" name="telefone" type="tel" value="{{ p.telefone|telefone }}" {% if bloqueio %}disabled{% endif %}>
+    <label for="data_admissao">Data de contratação</label>
+    <input id="data_admissao" name="data_admissao" type="date" value="{{ p.data_admissao.isoformat() if p.data_admissao else '' }}" {% if bloqueio %}disabled{% endif %}>
+    <label for="observacoes">Observações</label>
+    <textarea id="observacoes" name="observacoes" maxlength="500" {% if bloqueio %}disabled{% endif %}>{{ p.observacoes or '' }}</textarea>
+    {% if not bloqueio %}<div class="acoes"><button type="submit" class="botao claro">✓ SALVAR DADOS</button></div>{% endif %}
+  </form>
+</section>
+
+{% if gerir and not bloqueio %}
+<section class="cartao estreito">
+  <h2>Cargos e acesso</h2>
+  <form method="post" action="/equipe/{{ p.id }}/cargos" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {{ c.cargos(papeis, p.ativos, {"vinculo": p.vinculo, "ate": ((p.ate - timedelta(days=1)).date().isoformat() if p.ate else "")}) }}
+    <div class="acoes"><button type="submit" class="botao">✓ SALVAR CARGOS</button></div>
+  </form>
+</section>
+
+<section class="cartao estreito">
+  <h2>Avisos no WhatsApp</h2>
+  {% if not p.telefone %}<p class="aviso">Cadastre o WhatsApp da pessoa (acima) para ela receber os avisos.</p>{% endif %}
+  <form method="post" action="/equipe/{{ p.id }}/avisos">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="opcoes largas">
+      {% for k, nome in AVISOS.items() %}
+        <label class="opcao"><input type="checkbox" name="aviso_{{ k }}" value="1" {% if k in p.avisos %}checked{% endif %}>{{ nome }}</label>
+      {% endfor %}
+    </div>
+    <div class="acoes"><button type="submit" class="botao claro">✓ SALVAR AVISOS</button></div>
+  </form>
+</section>
+
+<section class="cartao estreito">
+  <h2>Aparelhos que entraram</h2>
+  {% if aparelhos %}
+  <div class="tabela-vidro"><table>
+    <tr><th>Aparelho</th><th>IP</th><th>Desde</th><th>Último uso</th></tr>
+    {% for a in aparelhos %}<tr><td>{{ a.navegador or "—" }}</td><td>{{ a.ip or "—" }}</td><td>{{ a.desde }}</td><td>{{ a.ultimo }}</td></tr>{% endfor %}
+  </table></div>
+  {% else %}<p class="vazio">Nenhum aparelho registrado ainda.</p>{% endif %}
+  <form method="post" action="/equipe/{{ p.id }}/desconectar">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="acoes"><button type="submit" class="botao claro">⏏ DESCONECTAR DE TODOS OS APARELHOS</button></div>
+  </form>
+</section>
+
+<section class="cartao estreito">
+  <h2>Senha</h2>
+  <form method="post" action="/equipe/{{ p.id }}/senha" novalidate autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="senha">Senha nova <span class="dica">Use quando a pessoa esquecer a senha.</span></label>
+    <input id="senha" name="senha" type="password" autocomplete="new-password">
+    <label for="senha2">Repita a senha</label>
+    <input id="senha2" name="senha2" type="password" autocomplete="new-password">
+    <div class="acoes"><button type="submit" class="botao claro">🔑 DEFINIR SENHA NOVA</button></div>
+  </form>
+  {% if p.bloqueado %}
+  <form method="post" action="/equipe/{{ p.id }}/desbloquear">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="acoes"><button type="submit" class="botao">🔓 DESBLOQUEAR AGORA</button></div>
+  </form>
+  {% endif %}
+</section>
+
+<section class="cartao estreito">
+  <h2>{{ "Desativar acesso" if p.ativo else "Liberar acesso de novo" }}</h2>
+  <p class="suave">{{ "A pessoa não entra mais no sistema. Nada do que ela fez é apagado." if p.ativo else "A pessoa volta a entrar com os mesmos cargos." }}</p>
+  <form method="post" action="/equipe/{{ p.id }}/ativo">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ativo" value="{{ '0' if p.ativo else '1' }}">
+    <div class="acoes"><button type="submit" class="botao {{ 'saida' if p.ativo else 'entrada' }}">{{ "DESATIVAR" if p.ativo else "LIBERAR ACESSO" }}</button></div>
+  </form>
+</section>
+{% endif %}
+
+{% if atividade %}
+<section class="cartao estreito">
+  <h2>O que fez por último</h2>
+  <ul class="linha-tempo">{% for a in atividade %}<li>{{ a.quando }} · {{ a.acao.replace("_", " ") }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}

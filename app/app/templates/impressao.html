@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block titulo %}{{ doc.titulo }}{% endblock %}
+{% block voltar %}{{ voltar }}{% endblock %}
+{% block conteudo %}
+<section class="cartao nao-imprimir">
+  {% if extra.periodo %}
+  <form method="get" action="{{ pagina }}">
+    <input type="hidden" name="formato" value="{{ formato }}">
+    {% if extra.aviso %}<p class="aviso">{{ extra.aviso }}</p>{% endif %}
+    <div class="acoes compacta">
+      {% for nome, d1, d2 in extra.atalhos %}
+        <a class="botao claro pequeno" href="{{ pagina }}?de={{ d1.isoformat() }}&amp;ate={{ d2.isoformat() }}&amp;formato={{ formato }}">{{ nome }}</a>
+      {% endfor %}
+    </div>
+    <div class="par">
+      <div><label for="de">De</label><input id="de" name="de" type="date" value="{{ extra.de }}"></div>
+      <div><label for="ate">Até</label><input id="ate" name="ate" type="date" value="{{ extra.ate }}"></div>
+    </div>
+    <div class="acoes"><button type="submit" class="botao claro">Mostrar este período</button></div>
+  </form>
+  {% endif %}
+  <span class="rotulo">Onde vai imprimir?</span>
+  <div class="opcoes">
+    {% for codigo, nome in FORMATOS.items() %}
+      <a class="opcao {{ 'escolhida' if codigo == formato }}" href="{{ pagina }}?{{ periodo }}formato={{ codigo }}"
+         {% if codigo == formato %}aria-current="true"{% endif %}>{{ nome }}
+        <small>{{ "impressora comum" if codigo == "a4" else "impressora de cupom" }}</small></a>
+    {% endfor %}
+  </div>
+  <div class="acoes">
+    <button type="button" class="botao" data-imprimir>🖨 IMPRIMIR</button>
+    <a class="botao claro" href="{{ pdf_url }}?{{ periodo }}formato={{ formato }}">⬇ BAIXAR PDF</a>
+  </div>
+  {% if formato != "a4" %}<p class="suave">Na janela de impressão, escolha a impressora térmica e deixe as margens em "Nenhuma".</p>{% endif %}
+</section>
+
+<article class="papel papel-{{ formato }}">
+  <header class="papel-cabeca">
+    {% if doc.loja.logo_arquivo %}<img class="papel-logo" src="/marca/{{ doc.loja.logo_arquivo }}-{{ 'mono' if formato in ('80', '58') else 'logo' }}.png" alt="">{% endif %}
+    <div class="papel-loja">{{ doc.loja.nome }}</div>
+    {% if doc.loja.cnpj %}<div>CNPJ {{ doc.loja.cnpj }}</div>{% endif %}
+    {% if doc.loja.endereco %}<div>{{ doc.loja.endereco }}</div>{% endif %}
+    {% if doc.loja.telefone %}<div>{{ doc.loja.telefone }}</div>{% endif %}
+  </header>
+  <hr>
+  <h2 class="papel-titulo">{{ doc.titulo }}{% if doc.numero %} nº {{ doc.numero }}{% endif %}</h2>
+  {% if doc.subtitulo %}<div class="papel-centro">{{ doc.subtitulo }}</div>{% endif %}
+  <div class="papel-centro papel-miudo">Emitido em {{ doc.emitido }}</div>
+  <hr>
+  {% for b in doc.blocos %}
+    {% if b.t == "secao" %}
+      <h3 class="papel-secao">{{ b.texto }}</h3>
+    {% elif b.t == "pares" %}
+      <table class="papel-pares">
+        {% for rotulo, valor, forte in b.itens %}<tr><td>{{ rotulo }}</td><td class="{{ 'forte' if forte }}">{{ valor }}</td></tr>{% endfor %}
+      </table>
+    {% elif b.t == "tabela" %}
+      {% if formato == "a4" %}
+      <table class="papel-tabela">
+        <thead><tr>{% for nome, alinhar, peso in b.colunas %}<th class="{{ 'num' if alinhar == 'R' }}">{{ nome }}</th>{% endfor %}</tr></thead>
+        <tbody>
+        {% for linha in b.linhas %}<tr>{% for v in linha %}<td class="{{ 'num' if b.colunas[loop.index0][1] == 'R' }}">{{ v }}</td>{% endfor %}</tr>{% endfor %}
+        {% if b.total %}<tr class="forte">{% for v in b.total %}<td class="{{ 'num' if b.colunas[loop.index0][1] == 'R' }}">{{ v }}</td>{% endfor %}</tr>{% endif %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="papel-lista">
+        {% for linha in b.linhas + ([b.total] if b.total else []) %}
+          <div class="papel-linha {{ 'forte' if b.total and loop.last }}">
+            <div class="papel-lado"><span>{{ linha[0] }}</span><span>{{ linha[-1] }}</span></div>
+            {% set meio = linha[1:-1]|select|join(" - ") %}{% if meio %}<div class="papel-miudo">{{ meio }}</div>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% elif b.t == "texto" %}
+      <p class="{{ 'papel-miudo' if b.pequeno }}">{{ b.texto }}</p>
+    {% elif b.t == "contrato" %}
+      {% if formato == "a4" %}<div class="papel-contrato">{{ b.texto }}</div>
+      {% else %}<h3 class="papel-secao">Contrato</h3><p class="papel-miudo">As condições completas estão no contrato deste pedido: {{ b.link }}</p>{% endif %}
+    {% elif b.t == "imagem" %}
+      <figure class="papel-assinatura"><img src="data:image/png;base64,{{ b.png|b64 }}" alt="Assinatura da cliente"><figcaption>{{ b.legenda }}</figcaption></figure>
+    {% elif b.t == "qr" %}
+      <div class="papel-qr">{{ qr_svg(b.url, "QR do pedido") }}<div><strong>{{ b.codigo }}</strong><br><span class="papel-miudo">{{ b.texto }}</span></div></div>
+    {% elif b.t == "codigo" %}
+      <p class="papel-centro forte">{{ b.texto }}</p>{% if b.detalhe %}<p class="papel-centro papel-miudo">{{ b.detalhe }}</p>{% endif %}
+    {% elif b.t == "assinaturas" %}
+      <div class="papel-assinaturas">
+        {% for nome in (b.nomes if formato == "a4" else b.nomes[:1]) %}<div class="papel-assina">{{ nome }}</div>{% endfor %}
+      </div>
+    {% endif %}
+  {% endfor %}
+  {% if doc.loja.rodape_comprovante %}<hr><p class="papel-centro">{{ doc.loja.rodape_comprovante }}</p>{% endif %}
+</article>
+<script src="{{ estatico('imprimir.js') }}" defer></script>
+{% endblock %}

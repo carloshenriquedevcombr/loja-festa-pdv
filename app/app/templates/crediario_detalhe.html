@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% import "_formulario.html" as f %}
+{% block titulo %}Crediário · {{ c.cliente }}{% endblock %}
+{% block voltar %}{{ "/pedidos/" ~ c.pedido_id if c.pedido_id else "/crediario" }}{% endblock %}
+{% block conteudo %}
+<section class="cartao">
+  {{ f.erro_box(erro) }}
+  {% if novo %}<p class="sucesso" role="status">Crediário liberado. Imprima o carnê e entregue à cliente.</p>{% endif %}
+  <p class="frase">📒 <strong>{{ c.cliente }}</strong> · {{ c.valor_centavos|brl }} em {{ c.parcelas }}x
+    {% if c.sku %}<br>Pedido <a href="/pedidos/{{ c.pedido_id }}"><span class="sku">{{ c.sku }}</span> {{ c.peca }}</a>{% endif %}</p>
+  <p>Situação: <strong>{{ {"ATIVO": "Em aberto", "QUITADO": "Quitado ✓", "CANCELADO": "Cancelado"}[c.status] }}</strong>
+     · pago {{ c.pago|brl }}{% if c.falta %} · falta <strong>{{ c.falta|brl }}</strong>{% endif %}</p>
+  <p class="suave">Liberado por {{ c.criado_por_nome }}{% if c.cancelado_por_nome %} · cancelado por {{ c.cancelado_por_nome }}: {{ c.motivo_cancel }}{% endif %}</p>
+  <div class="acoes">
+    {% if c.proxima and pode("caixa.entrada") %}<a class="botao entrada" href="/crediario/{{ c.id }}/parcela/{{ c.proxima.numero }}">💵 RECEBER PARCELA {{ c.proxima.numero }} ({{ c.proxima.valor_centavos|brl }})</a>{% endif %}
+  </div>
+  {% if c.status == "ATIVO" %}
+  <div class="bloco-imprimir" aria-label="Imprimir o carnê">
+    <p class="rotulo-grupo">🖨 Imprimir o carnê</p>
+    <div class="acoes">
+      <a class="botao claro" href="/crediario/{{ c.id }}/carne?formato=a4&amp;codigo=barras" data-dica="Folha A4, 3 parcelas por folha, com código de barras e os números de cada parcela.">📄 A4 · código de barras</a>
+      <a class="botao claro" href="/crediario/{{ c.id }}/carne?formato=a4&amp;codigo=qr" data-dica="Folha A4 com QR code do código de cada parcela.">📄 A4 · QR code</a>
+      <a class="botao claro" href="/crediario/{{ c.id }}/carne?formato=80&amp;codigo=barras" data-dica="Impressora térmica de cupom (80 mm), código de barras.">🧾 Térmica · barras</a>
+      <a class="botao claro" href="/crediario/{{ c.id }}/carne?formato=80&amp;codigo=qr" data-dica="Impressora térmica de cupom (80 mm), QR code.">🧾 Térmica · QR</a>
+    </div>
+  </div>
+  {% endif %}
+  {% if c.status == "ATIVO" and not tem_pix %}<p class="suave">Dica: cadastre a chave Pix da loja em <a href="/crediario">Crediário</a> para o carnê sair com QR Code Pix.</p>{% endif %}
+</section>
+
+<section class="cartao">
+  <h2>Parcelas</h2>
+  <table class="tabela-parcelas">
+    <thead><tr><th>Nº</th><th>Vencimento</th><th>Valor</th><th>Situação</th></tr></thead>
+    <tbody>
+    {% for p in c.lista %}
+      <tr><td>{{ p.numero }}/{{ c.parcelas }}</td><td>{{ p.vencimento|data }}</td><td>{{ p.valor_centavos|brl }}</td>
+        <td>{% if p.paga_em %}<span class="paga">✓ Paga ({{ EM_FORMA[p.forma_pagamento] }})</span>
+            {% elif c.status != "ATIVO" %}—
+            {% elif p.vencida %}<span class="vencida">Vencida</span> {% if pode("caixa.entrada") %}<a href="/crediario/{{ c.id }}/parcela/{{ p.numero }}">receber</a>{% endif %}
+            {% else %}Em aberto {% if pode("caixa.entrada") %}<a href="/crediario/{{ c.id }}/parcela/{{ p.numero }}">receber</a>{% endif %}{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="suave">Recebeu errado? Desfaça pelo <a href="/caixa">Caixa do dia</a> (a parcela volta a ficar em aberto).</p>
+</section>
+
+{% if pode_cancelar %}
+<section class="cartao estreito">
+  <h2>Cancelar crediário</h2>
+  <p class="suave">As parcelas já pagas continuam no caixa. O que falta volta a aparecer como “falta pagar” no pedido.</p>
+  <form method="post" action="/crediario/{{ c.id }}/cancelar">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="motivo">Motivo</label>
+    <input id="motivo" name="motivo" type="text" maxlength="150" required>
+    <div class="acoes"><button type="submit" class="botao saida">CANCELAR CREDIÁRIO</button></div>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

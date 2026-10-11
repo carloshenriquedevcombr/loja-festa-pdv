@@ -1,0 +1,77 @@
+{% extends "site/base.html" %}
+{% import "site/_card.html" as c %}
+{% block conteudo %}
+{% if banners %}
+<section class="banners" aria-label="Promoções" data-girar="7">
+  <div class="banners-trilho">
+    {% for b in banners %}
+    <article class="banner tema-{{ b.tema }} {{ 'com-imagem' if b.imagem }}" id="banner-{{ loop.index }}">
+      {% if b.imagem %}<img class="banner-foto" src="/fotos/{{ b.imagem }}-1600.jpg"
+           srcset="/fotos/{{ b.imagem }}-960.jpg 960w, /fotos/{{ b.imagem }}-1600.jpg 1600w" sizes="100vw" alt=""
+           {% if not loop.first %}loading="lazy"{% endif %}>{% endif %}
+      <div class="banner-texto">
+        <h2>{{ b.titulo }}</h2>
+        {% if b.texto %}<p>{{ b.texto }}</p>{% endif %}
+        {% if b.link %}<a class="botao-site" href="{{ b.link }}">{{ b.botao or "Ver agora" }}</a>{% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% if banners|length > 1 %}
+  <nav class="banners-pontos" aria-label="Escolher promoção">
+    {% for b in banners %}<a href="#banner-{{ loop.index }}" aria-label="Promoção {{ loop.index }}: {{ b.titulo }}"></a>{% endfor %}
+  </nav>
+  {% endif %}
+</section>
+<script src="{{ estatico('vitrine.js') }}" defer></script>
+{% endif %}
+<section class="hero {{ 'com-foto' if destaque }}">
+  {% if destaque %}
+  <img class="hero-foto" src="/fotos/{{ destaque.capa }}-1600.jpg"
+       srcset="/fotos/{{ destaque.capa }}-960.jpg 960w, /fotos/{{ destaque.capa }}-1600.jpg 1600w" sizes="100vw" alt="{{ destaque.nome }}">
+  {% endif %}
+  <div class="hero-texto">
+    <p class="sobretitulo">Aluguel e venda</p>
+    <h1>{{ loja.frase_site or "Roupas de festa para o seu grande dia" }}</h1>
+    <div class="hero-botoes">
+      <a class="botao-site" href="/site/colecao">Ver a coleção</a>
+      <a class="botao-site contorno" href="/site/prova">Agendar prova</a>
+    </div>
+  </div>
+</section>
+
+{% if vitrines %}
+<section class="bloco">
+  <h2 class="titulo-bloco">Escolha pela ocasião</h2>
+  <div class="ocasioes">
+    {% for o in vitrines %}
+      <a class="ocasiao" href="/site/c/{{ o.pai_slug ~ '/' ~ o.slug if o.pai_slug else o.slug }}">
+        <img src="/fotos/{{ o.foto }}-480.jpg" srcset="/fotos/{{ o.foto }}-480.jpg 480w, /fotos/{{ o.foto }}-960.jpg 960w"
+             sizes="(max-width: 700px) 50vw, 25vw" alt="" loading="lazy">
+        <span>{{ o.nome }}</span>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="bloco como-funciona">
+  <h2 class="titulo-bloco">Como funciona</h2>
+  <ol>
+    <li><span class="numero-passo">1</span><h3>Escolha</h3><p>Veja as peças por ocasião, tamanho e cor, e confira se está livre na data da sua festa.</p></li>
+    <li><span class="numero-passo">2</span><h3>Prove</h3><p>Agende sua prova. Tiramos as medidas e fazemos os ajustes para ficar perfeito em você.</p></li>
+    <li><span class="numero-passo">3</span><h3>Brilhe</h3><p>Retire a peça pronta, aproveite a festa e devolva depois — a limpeza é por nossa conta.</p></li>
+  </ol>
+  <p class="centro"><a class="botao-site" href="/site/prova">Agendar minha prova</a></p>
+</section>
+
+<section class="bloco">
+  <h2 class="titulo-bloco">Novidades</h2>
+  {% if novidades %}
+  <div class="grade-pecas">{% for p in novidades %}{{ c.card(p) }}{% endfor %}</div>
+  <p class="centro"><a class="botao-site contorno" href="/site/colecao">Ver todas as peças</a></p>
+  {% else %}
+  <p class="centro suave">Nossa coleção está sendo fotografada. Enquanto isso, fale com a gente pelo WhatsApp.</p>
+  {% endif %}
+</section>
+{% endblock %}

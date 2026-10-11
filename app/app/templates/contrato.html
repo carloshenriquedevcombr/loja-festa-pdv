@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block titulo %}Contrato · {{ p.sku }}{% endblock %}
+{% block voltar %}/pedidos/{{ p.id }}{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+  {% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+  <div class="contrato-texto" tabindex="0" aria-label="Texto do contrato">{{ texto }}</div>
+
+  {% if assinado %}
+    <figure class="assinatura-mostrada">
+      <img src="data:image/png;base64,{{ png }}" alt="Assinatura de {{ assinado.assinante }}">
+      <figcaption>Assinado por <strong>{{ assinado.assinante }}</strong> em {{ assinado.quando }}{% if assinado.atendente %} · atendida por {{ assinado.atendente }}{% endif %}</figcaption>
+    </figure>
+    <p class="codigo-contrato">Código de verificação <strong>{{ assinado.codigo }}</strong>
+      {% if assinado.confere %}<span class="selo ok">Íntegro</span>{% else %}<span class="selo alerta">ALTERADO — avise o suporte</span>{% endif %}</p>
+    <div class="acoes">
+      <a class="botao" href="/pedidos/{{ p.id }}/imprimir">🖨 Imprimir (A4)</a>
+      <a class="botao claro" href="/pedidos/{{ p.id }}/pdf">⬇ PDF</a>
+      <form method="post" action="/pedidos/{{ p.id }}/enviar-comprovante"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="botao claro cheio">✆ Mandar para a cliente</button></form>
+    </div>
+  {% elif pode("pedidos.criar") and p.cliente and p.status != "CANCELADO" %}
+    <form method="post" action="/pedidos/{{ p.id }}/contrato" class="form-assinatura" novalidate>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="assinatura" id="assinatura">
+      <div class="opcoes largas">
+        <label class="opcao"><input type="checkbox" name="aceite" value="1">Eu, {{ p.cliente }}, li e concordo com o contrato</label>
+      </div>
+      <p class="rotulo">Assinatura da cliente <span class="dica">Com o dedo ou a caneta, dentro do quadro</span></p>
+      <canvas id="quadro-assinatura" class="quadro-assinatura" aria-label="Quadro para a assinatura"></canvas>
+      <div class="acoes compacta">
+        <button type="button" id="apagar-assinatura" class="botao claro pequeno">Apagar e assinar de novo</button>
+      </div>
+      <p class="sem-js aviso">Este aparelho não conseguiu abrir o quadro de assinatura. Imprima o contrato e assine no papel.</p>
+      <div class="acoes"><button type="submit" class="botao entrada">✍ CONFIRMAR ASSINATURA</button></div>
+    </form>
+    <script src="{{ estatico('assinatura.js') }}" defer></script>
+  {% else %}
+    <p class="aviso">Ainda não assinado.</p>
+  {% endif %}
+</section>
+{% endblock %}

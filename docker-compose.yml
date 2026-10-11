@@ -1,0 +1,163 @@
+# Sistema Loja de Festa — produção na VPS existente
+#
+# Convive com Nginx Proxy Manager, Portainer, n8n, WPPConnect e Absenteísmo:
+#   * NÃO sobe Nginx próprio: o NPM já faz HTTPS e encaminha para loja-app:8000
+#   * O banco fica numa rede INTERNA, sem porta publicada e fora da rede do NPM.
+#     Nenhum outro container da VPS consegue chegar nele.
+#   * Nenhuma porta é aberta no host.
+#   * Limites de memória para não disputar os 4 GB com os outros serviços.
+name: loja-festa
+
+services:
+  db:
+    build:
+      context: .
+      dockerfile: db/Dockerfile
+    image: loja-festa/db:latest
+    container_name: loja-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: loja
+      POSTGRES_USER: loja_owner
+      POSTGRES_PASSWORD: ${DB_OWNER_PASSWORD:?defina DB_OWNER_PASSWORD no .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?defina APP_DB_PASSWORD no .env}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=192MB
+      - -c
+      - effective_cache_size=512MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=40
+      - -c
+      - log_min_duration_statement=500
+      - -c
+      - timezone=America/Sao_Paulo
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks: [interna]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loja_owner -d loja"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    shm_size: 128mb
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    security_opt: ["no-new-privileges:true"]
+    logging: &logs
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+
+  app:
+    build: ./app
+    image: loja-festa/app:latest
+    container_name: loja-app          # nome usado no Nginx Proxy Manager
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      DATABASE_URL: postgresql://app_user:${APP_DB_PASSWORD}@db:5432/loja
+      SESSION_SECRET: ${SESSION_SECRET:?defina SESSION_SECRET no .env}
+      LOJA_ID: ${LOJA_ID:-}
+      COOKIE_SECURE: "1"
+      FOTOS_DIR: /dados/fotos
+      SITE_URL: ${SITE_URL:-}           # ex.: https://www.minhaloja.com.br (aviso automático do Mercado Pago)
+      DADOS_CHAVE: ${DADOS_CHAVE:?defina DADOS_CHAVE no .env (e guarde uma cópia FORA da VPS)}
+      CLOUDFLARE: ${CLOUDFLARE:-0}      # 1 = o site passa pela Cloudflare (IP real e "só Brasil")
+      ATRAS_DO_PROXY: "1"               # o IP real vem do Nginx Proxy Manager (não do navegador)
+      HOSTS_PERMITIDOS: ${HOSTS_PERMITIDOS:-}   # além do domínio do SITE_URL (ex.: www.minhaloja.com.br)
+      SO_BRASIL: ${SO_BRASIL:-1}
+      SESSAO_OCIOSA_MIN: ${SESSAO_OCIOSA_MIN:-30}
+      MELHOR_ENVIO_TOKEN: ${MELHOR_ENVIO_TOKEN:-}
+      MELHOR_ENVIO_SANDBOX: ${MELHOR_ENVIO_SANDBOX:-0}
+    volumes:
+      - fotos:/dados/fotos              # fotos das peças (entram no backup)
+    networks: [interna, proxy]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    logging: *logs
+
+  avisos:
+    # Envia a fila de WhatsApp/e-mail e roda lembretes e relatórios (mesma imagem do app)
+    image: loja-festa/app:latest
+    container_name: loja-avisos
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+      app: {condition: service_started}
+    command: ["python", "-m", "app.trabalhador"]
+    healthcheck: {disable: true}
+    environment:
+      DATABASE_URL: postgresql://app_user:${APP_DB_PASSWORD}@db:5432/loja
+      SESSION_SECRET: ${SESSION_SECRET}
+      LOJA_ID: ${LOJA_ID:-}
+      DADOS_CHAVE: ${DADOS_CHAVE}
+      SITE_URL: ${SITE_URL:-}
+      GOOGLE_PLACES_KEY: ${GOOGLE_PLACES_KEY:-}
+      MELHOR_ENVIO_TOKEN: ${MELHOR_ENVIO_TOKEN:-}
+      MELHOR_ENVIO_SANDBOX: ${MELHOR_ENVIO_SANDBOX:-0}
+    networks: [interna, proxy]          # "proxy": chega no WPPConnect e no Gmail
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 160M
+    logging: *logs
+
+  backup:
+    build: ./backup
+    image: loja-festa/backup:latest
+    container_name: loja-backup
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      PGHOST: db
+      PGUSER: loja_owner
+      PGPASSWORD: ${DB_OWNER_PASSWORD}
+      PGDATABASE: loja
+      BACKUP_HORA: ${BACKUP_HORA:-03:00}
+      RETENCAO_LOCAL_DIAS: "7"
+      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:-}
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD:-}
+      AWS_ACCESS_KEY_ID: ${RESTIC_S3_ACCESS_KEY:-}
+      AWS_SECRET_ACCESS_KEY: ${RESTIC_S3_SECRET_KEY:-}
+    volumes:
+      - backups:/backups
+      - fotos:/fotos:ro
+    networks: [interna, saida]      # "saida": só para enviar a cópia externa
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging: *logs
+
+networks:
+  interna:
+    internal: true                  # sem internet e sem acesso de fora
+  saida: {}
+  proxy:
+    external: true
+    name: "${NPM_NETWORK:?defina NPM_NETWORK no .env (rede do Nginx Proxy Manager)}"
+
+volumes:
+  db_data:
+  backups:
+  fotos:

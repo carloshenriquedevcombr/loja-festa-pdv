@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ loja.nome }}</title><link rel="stylesheet" href="{{ estatico('site.css') }}"></head>
+<body class="site"><main class="pagina-estreita centro fechado">
+  <p class="marca">{{ loja.nome }}</p>
+  <h1 class="titulo-pagina">Voltamos em breve</h1>
+  <p>Estamos preparando novidades.{% if loja.whatsapp %} Fale com a gente pelo WhatsApp {{ loja.whatsapp|telefone }}.{% endif %}</p>
+  <p><a href="/login">Área da equipe</a></p>
+</main></body></html>

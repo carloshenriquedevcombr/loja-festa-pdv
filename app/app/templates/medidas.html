@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% import "_figuras.html" as fig %}
+{% block titulo %}Medidas · {{ c.nome }}{% endblock %}
+{% block voltar %}{{ "/clientes/" ~ c.id if pode("clientes.ver") else "/costura" }}{% endblock %}
+{% macro campo(ficha, n, chave, nome, dica, costas) %}
+  <div class="campo-medida">
+    <span class="num-medida" aria-hidden="true">{{ n }}</span>
+    <label for="m-{{ chave }}-{{ ficha }}">{{ nome }}{% if costas %} <span class="selo neutro">costas</span>{% endif %}<span class="dica">{{ dica }}</span></label>
+    <span class="entrada-cm"><input id="m-{{ chave }}-{{ ficha }}" name="m_{{ ficha }}_{{ chave }}" inputmode="decimal" autocomplete="off" value="{{ v.get('m_' ~ ficha ~ '_' ~ chave, '') }}"><span>cm</span></span>
+  </div>
+{% endmacro %}
+{% block conteudo %}
+{% if ok %}<p class="sucesso" role="status">Medidas guardadas! As antigas continuam no histórico abaixo.</p>{% endif %}
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+
+{% if editar %}
+<form method="post" action="/clientes/{{ c.id }}/medidas" class="cartao ficha-medidas" novalidate>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="cabeca-ficha">
+    <span class="rotulo">Qual ficha?</span>
+    <div class="opcoes">
+      {% for codigo, f in FICHAS.items() %}
+        <label class="opcao"><input type="radio" name="ficha" value="{{ codigo }}" {% if ficha == codigo %}checked{% endif %}>Ficha {{ f.nome|lower }}
+          <small>{{ f.pontos|length }} medidas</small></label>
+      {% endfor %}
+    </div>
+  </div>
+  {% for codigo, f in FICHAS.items() %}
+  <div class="ficha-corpo so-{{ codigo|lower }}">
+    <div class="ficha-desenho">
+      {{ fig.figura(codigo) }}
+      <p class="dica">Toque num campo e o número acende no desenho. Tracejado = medida nas costas.</p>
+    </div>
+    <div class="ficha-campos">
+      {% for n, chave, nome, dica, minimo, maximo, costas in f.pontos %}{{ campo(codigo, n, chave, nome, dica, costas) }}{% endfor %}
+      {% if codigo == "FEMININO" %}
+      <div class="campo-medida">
+        <span class="num-medida" aria-hidden="true">👠</span>
+        <label for="salto">Salto usado na prova<span class="dica">Muda o comprimento do vestido longo</span></label>
+        <span class="entrada-cm"><input id="salto" name="salto" inputmode="decimal" value="{{ v.salto or '' }}"><span>cm</span></span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  <label for="observacoes">Observações da costura <span class="dica">Ex.: subir a barra 3 cm, apertar 2 cm na cintura, alça mais curta</span></label>
+  <textarea id="observacoes" name="observacoes" maxlength="300">{{ v.observacoes or '' }}</textarea>
+  <div class="acoes">
+    <button type="submit" class="botao">✓ GUARDAR MEDIDAS</button>
+    <a class="botao claro" href="/clientes/{{ c.id }}/medidas/imprimir?ficha={{ ficha }}">🖨 Imprimir ficha</a>
+  </div>
+</form>
+{% else %}
+<section class="cartao">
+  <p>Quem anota as medidas é a costureira, a gerente ou a dona. Aqui você vê as últimas medidas.</p>
+</section>
+{% endif %}
+
+{% if sugestao and (sugestao.paleto or sugestao.calca) %}
+<section class="cartao">
+  <h2>Tamanho sugerido (ternos)</h2>
+  <p>{% if sugestao.paleto %}Paletó <strong>{{ sugestao.paleto }}</strong>{% endif %}{% if sugestao.paleto and sugestao.calca %} · {% endif %}
+     {% if sugestao.calca %}Calça <strong>{{ sugestao.calca }}</strong>{% endif %}
+     <span class="dica">Pela tabela de referência da loja (tórax e cintura). Confirme sempre na prova.</span></p>
+</section>
+{% endif %}
+
+<section class="cartao">
+  <h2>Histórico de medidas</h2>
+  {% for m in historico %}
+  <div class="medicao">
+    <p><strong>{{ m.quando }}</strong> · ficha {{ FICHAS[m.ficha].nome|lower }} · {{ m.quem }}{% if m.salto_cm %} · salto {{ numero(m.salto_cm) }} cm{% endif %}
+       {% if loop.first %}<span class="selo ok">Mais recente</span>{% endif %}</p>
+    <ul class="valores-medida">
+      {% for n, chave, nome, dica, minimo, maximo, costas in FICHAS[m.ficha].pontos if chave in m.valores %}
+        <li><span class="num-medida pequeno">{{ n }}</span> {{ nome }} <strong>{{ numero(m.valores[chave]) }} cm</strong>
+          {% if chave in m.diferenca %}<span class="diferenca">({{ "+" if m.diferenca[chave] > 0 }}{{ numero(m.diferenca[chave]) }})</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% if m.observacoes %}<p class="suave">📝 {{ m.observacoes }}</p>{% endif %}
+    <a class="botao claro pequeno" href="/clientes/{{ c.id }}/medidas/imprimir?ficha={{ m.ficha }}">🖨 Imprimir</a>
+  </div>
+  {% else %}
+  <p class="vazio">Nenhuma medida ainda.{% if editar %} Preencha a ficha acima na primeira prova.{% endif %}
+     <a href="/clientes/{{ c.id }}/medidas/imprimir?ficha=FEMININO&amp;em_branco=1">Imprimir ficha em branco</a>.</p>
+  {% endfor %}
+</section>
+{% endblock %}

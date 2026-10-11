@@ -1,0 +1,50 @@
+{% import "_icones.html" as ic %}
+{% if destaques %}
+<section class="destaques" aria-label="Informações da loja">
+  {% for d in destaques %}
+  <a class="destaque-item" href="{{ d.link or '/site' }}">
+    <span class="destaque-icone">{{ ic.icone(d.icone) }}</span>
+    <span class="destaque-texto"><strong>{{ d.titulo }}</strong>{% if d.texto %}<small>{{ d.texto }}</small>{% endif %}</span>
+  </a>
+  {% endfor %}
+</section>
+{% endif %}
+{% if avaliacoes and avaliacoes.ligado and (avaliacoes.proprias or avaliacoes.google or avaliacoes.google_nota) %}
+<section class="avaliacoes-site" aria-labelledby="titulo-avaliacoes">
+  <h2 id="titulo-avaliacoes" class="titulo-bloco">O que dizem nossas clientes</h2>
+  <div class="avaliacoes-notas">
+    {% if avaliacoes.google_nota %}
+    <div class="nota-caixa">
+      <span class="nota-numero">{{ "%.1f"|format(avaliacoes.google_nota)|replace(".", ",") }}</span>
+      <span class="estrelas" role="img" aria-label="{{ avaliacoes.google_nota }} de 5 estrelas">{% for i in range(5) %}<span class="{{ 'cheia' if i < (avaliacoes.google_nota|float)|round|int }}">★</span>{% endfor %}</span>
+      <span class="nota-fonte">no Google{% if avaliacoes.google_total %} · {{ avaliacoes.google_total }} avaliações{% endif %}</span>
+      {% if avaliacoes.google_link %}<a href="{{ avaliacoes.google_link }}" target="_blank" rel="noopener">Ver no Google</a>{% endif %}
+    </div>
+    {% endif %}
+    {% if avaliacoes.total %}
+    <div class="nota-caixa">
+      <span class="nota-numero">{{ "%.1f"|format(avaliacoes.media)|replace(".", ",") }}</span>
+      <span class="estrelas" role="img" aria-label="{{ avaliacoes.media }} de 5 estrelas">{% for i in range(5) %}<span class="{{ 'cheia' if i < (avaliacoes.media|float)|round|int }}">★</span>{% endfor %}</span>
+      <span class="nota-fonte">aqui no site · {{ avaliacoes.total }} avaliaç{{ "ões" if avaliacoes.total != 1 else "ão" }}</span>
+    </div>
+    {% endif %}
+  </div>
+  <div class="carrossel" tabindex="0" aria-label="Comentários (arraste para o lado)">
+    {% for a in avaliacoes.proprias %}
+    <figure class="comentario">
+      <span class="estrelas" role="img" aria-label="{{ a.nota }} de 5">{% for i in range(5) %}<span class="{{ 'cheia' if i < a.nota }}">★</span>{% endfor %}</span>
+      {% if a.texto %}<blockquote>{{ a.texto }}</blockquote>{% endif %}
+      <figcaption>{{ a.nome_exibicao }} · {{ a.quando }}</figcaption>
+      {% if a.resposta %}<p class="resposta-loja"><strong>Resposta da loja:</strong> {{ a.resposta }}</p>{% endif %}
+    </figure>
+    {% endfor %}
+    {% for g in avaliacoes.google %}
+    <figure class="comentario google">
+      {% if g.nota %}<span class="estrelas" role="img" aria-label="{{ g.nota }} de 5">{% for i in range(5) %}<span class="{{ 'cheia' if i < g.nota }}">★</span>{% endfor %}</span>{% endif %}
+      {% if g.texto %}<blockquote>{{ g.texto }}</blockquote>{% endif %}
+      <figcaption>{% if g.autor_link %}<a href="{{ g.autor_link }}" target="_blank" rel="noopener nofollow">{{ g.autor }}</a>{% else %}{{ g.autor }}{% endif %}{% if g.quando %} · {{ g.quando }}{% endif %} · <span class="fonte-google">Google</span></figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}

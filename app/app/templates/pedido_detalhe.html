@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block titulo %}Pedido {{ pe.sku }}{% endblock %}
+{% block voltar %}/pedidos{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {% if novo %}<p class="sucesso">Pedido guardado!</p>{% endif %}
+  {% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+  {% if recado_link %}<p class="sucesso" role="status">{{ recado_link }}</p>{% endif %}
+  <p><span class="selo info">{{ STATUS[pe.status] }}</span>{% if pe.reserva_ate_devolver and pe.status not in ("CANCELADO", "CONCLUIDO", "RETIRADO", "VENDIDO") %} <span class="selo neutro">Peça fora do estoque até a devolução</span>{% endif %}</p>
+  {% if dias_atraso %}<p class="aviso" role="alert">Devolução atrasada há {{ dias_atraso }} dia{{ "s" if dias_atraso != 1 }} (era em {{ pe.data_devolucao|data }}). A cliente recebe aviso no WhatsApp todo dia. Quando ela trouxer, aperte "Cliente devolveu".</p>{% endif %}
+  <h2>{{ pe.cliente or "Venda no balcão" }}{% if pe.telefone %} <span class="suave">· {{ pe.telefone|telefone }}</span>{% endif %}</h2>
+  <p>{{ TIPOS["ALUGUEL" if pe.tipo == "ALUGUEL" else ("VENDA_AJUSTE" if pe.com_ajuste else "VENDA_SIMPLES")] }}:
+     <a href="/pecas/{{ pe.produto }}"><span class="sku">{{ pe.sku }}</span> {{ pe.peca }}</a></p>
+  {% if pe.data_retirada %}<p>Retirada: <strong>{{ pe.data_retirada|data }}</strong>{% if pe.data_devolucao %} · Devolução: <strong>{{ pe.data_devolucao|data }}</strong>{% endif %}{% if pe.data_festa %}<br><span class="suave">Festa em {{ pe.data_festa|data }}</span>{% endif %}</p>{% endif %}
+
+  <div class="tabela-vidro"><table>
+    <tr><td>Total</td><td class="num">{{ pe.valor_total_centavos|brl }}</td></tr>
+    <tr><td>Já pago</td><td class="num">{{ pe.pago|brl }}</td></tr>
+    {% if pe.status == "CANCELADO" %}<tr><th>Pedido cancelado</th><th class="num">—</th></tr>
+    {% else %}<tr><th>{{ "Falta pagar" if pe.saldo > 0 else "Quitado" }}</th><th class="num">{{ pe.saldo|brl }}</th></tr>{% endif %}
+  </table></div>
+
+  {% if pe.status == "AGUARDANDO_PAGAMENTO" %}
+    <p class="aviso">Esperando a cliente pagar a entrada pelo link. Quando o pagamento entrar, o pedido vira <strong>Reservado</strong> sozinho. Se o link vencer sem pagamento, a peça é liberada.</p>
+  {% endif %}
+
+  {% if links or ((link_online or link_pix) and pe.saldo > 0 and pe.status not in ("CANCELADO", "CONCLUIDO", "RETIRADO", "VENDIDO")) %}
+  <h3 id="pagamento-online">Link de pagamento</h3>
+  {% if link_novo %}<p class="sucesso">Link criado! Mande para a cliente pelo WhatsApp.</p>{% endif %}
+  {% if erro_link %}<p class="aviso" role="alert">{{ erro_link }}</p>{% endif %}
+  {% for l in links %}
+    <div class="caixa-link">
+      <p><strong>{{ l.valor_centavos|brl }}</strong> · {{ "Pix da loja" if l.provedor == "PIX_LOJA" else "Mercado Pago" }} · criado {{ l.criado }} por {{ l.quem }}<br>
+        {% if l.status == "PAGO" %}<span class="selo ok">Pago {{ l.pago }}{% if l.forma_paga %} · {{ FORMAS.get(l.forma_paga, l.forma_paga) }}{% endif %}</span>
+        {% elif l.status == "PAGO_CONFERIR" %}<span class="selo alerta">Pago · precisa conferir</span><br><span class="suave">{{ l.observacao }}</span>
+        {% elif l.status == "CANCELADO" %}<span class="selo neutro">{{ l.observacao or "Cancelado" }}</span>
+        {% elif l.vencido %}<span class="selo neutro">Venceu {{ l.expira }}</span>
+        {% else %}<span class="selo info">Esperando pagamento · vale até {{ l.expira }}</span>{% endif %}</p>
+      {% if l.status == "ABERTO" and not l.vencido %}
+        <p class="link-copiar"><span class="suave">Link para a cliente:</span><br><strong>{{ l.curto }}</strong></p>
+        <div class="acoes compacta">
+          {% if l.whatsapp %}<a class="botao entrada pequeno" href="{{ l.whatsapp }}" target="_blank" rel="noopener">💬 Mandar no WhatsApp</a>{% endif %}
+          {% if l.provedor == "PIX_LOJA" %}
+          {% if pode("caixa.entrada") %}<form method="post" action="/pagamentos/links/{{ l.id }}/pix-recebido"><input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="botao entrada pequeno" data-dica="Só confirme depois de ver o Pix de {{ l.valor_centavos|brl }} no extrato do banco da loja. O valor entra no caixa.">✓ Pix caiu no banco: confirmar</button></form>{% endif %}
+          {% else %}
+          <form method="post" action="/pagamentos/links/{{ l.id }}/conferir"><input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="botao claro pequeno">↻ Conferir se pagou</button></form>
+          {% endif %}
+          {% if pode("pagamento.link") %}<form method="post" action="/pagamentos/links/{{ l.id }}/cancelar"><input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="botao claro pequeno">Cancelar link</button></form>{% endif %}
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+  {% if (link_online or link_pix) and pode("pagamento.link") and pe.saldo > 0 and pe.status not in ("CANCELADO", "CONCLUIDO", "RETIRADO", "VENDIDO") %}
+  <form method="post" action="/pedidos/{{ pe.id }}/link" class="espaco">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <fieldset class="opcoes"><legend>Receber por</legend>
+      {% if link_online %}<label class="opcao"><input type="radio" name="provedor" value="MERCADO_PAGO" checked> Mercado Pago <small>Pix e cartão, entra sozinho no caixa</small></label>{% endif %}
+      {% if link_pix %}<label class="opcao"><input type="radio" name="provedor" value="PIX_LOJA" {{ "checked" if not link_online }}> Pix da loja <small>Cai na conta da loja (Inter, Itaú, qualquer banco). Confirme ao ver no extrato.</small></label>{% endif %}
+    </fieldset>
+    <label for="valor_link">Valor do link <span class="dica">Deixe em branco para cobrar tudo o que falta ({{ pe.saldo|brl }})</span></label>
+    <input id="valor_link" name="valor" class="valor" inputmode="decimal">
+    <div class="acoes"><button type="submit" class="botao claro">🔗 GERAR LINK DE PAGAMENTO</button></div>
+  </form>
+  {% endif %}
+  {% endif %}
+
+  {% if etapas or (pe.saldo > 0 and pe.status != "CANCELADO") %}
+  <h3>Próximo passo</h3>
+  <div class="acoes">
+    {% if pe.saldo > 0 and pe.status != "CANCELADO" and pode("caixa.entrada") %}
+      <a class="botao entrada" href="/pedidos/{{ pe.id }}/receber">+ Receber pagamento</a>
+      {% if pode("crediario.liberar") and pe.cliente_id %}<a class="botao claro" href="/pedidos/{{ pe.id }}/receber?forma=CREDIARIO" data-dica="Parcelar o que falta no crediário da loja: gera o carnê para imprimir (A4 ou térmica) com o código de cada parcela.">📒 Parcelar no carnê da loja</a>{% endif %}{% endif %}
+    {% for e in etapas %}
+      {% if e.precisa_quitar and pe.saldo > 0 %}
+        <button class="botao" disabled title="Falta pagar">{{ e.rotulo }} (falta pagar {{ pe.saldo|brl }})</button>
+      {% else %}
+        <form method="post" action="/pedidos/{{ pe.id }}/etapa">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="para" value="{{ e.para }}">
+          <button type="submit" class="botao cheio">{{ e.rotulo }}</button>
+        </form>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if agenda %}
+  <h3>Agenda do processo</h3>
+  <ul class="linha-tempo agenda-pedido">
+    <li>{{ marcos.contratado }} · <strong>Contratação</strong> <span class="selo ok">Feito</span></li>
+    {% for a in agenda %}
+    <li class="{{ 'riscado' if a.status == 'CANCELADO' }}">
+      {{ a.dia|data }} às {{ a.hora }} · <strong>{{ COMPROMISSOS[a.tipo] }}</strong>
+      {% if a.status == "FEITO" %}<span class="selo ok">Feito</span>
+      {% elif a.status == "CANCELADO" %}<span class="selo neutro">Cancelado</span>
+      {% elif a.status == "FALTOU" %}<span class="selo alerta">Faltou</span>
+      {% elif a.atrasado %}<span class="selo alerta">Atrasado</span>
+      {% elif a.status == "REMARCADO" %}<span class="selo info">Remarcado</span>
+      {% else %}<span class="selo info">Marcado</span>{% endif %}
+      {% if a.observacao %}<br><span class="suave">{{ a.observacao }}</span>{% endif %}
+      {% if a.status in ("AGENDADO", "REMARCADO", "FALTOU") and pe.status != "CANCELADO" %}
+      <div class="acoes compacta">
+        {% if pode("agenda.editar") %}<a class="botao claro pequeno" href="/agenda/{{ a.id }}/remarcar">📅 Remarcar</a>{% endif %}
+        {% if a.whatsapp %}<a class="botao claro pequeno" href="{{ a.whatsapp }}" target="_blank" rel="noopener">💬 Lembrar no WhatsApp</a>{% endif %}
+        {% if pode("agenda.editar") and a.status != "FALTOU" and a.atrasado %}
+        <form method="post" action="/agenda/{{ a.id }}/faltou">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="volta" value="/pedidos/{{ pe.id }}">
+          <button type="submit" class="botao claro pequeno">✗ Cliente faltou</button></form>{% endif %}
+      </div>
+      {% endif %}
+    </li>
+    {% endfor %}
+    {% if marcos.limpeza_ate and pe.status != "CANCELADO" %}<li>{{ marcos.limpeza_ate|data }} · <strong>Peça livre de novo</strong> <span class="suave">(depois da limpeza)</span></li>{% endif %}
+  </ul>
+  {% endif %}
+
+  {% if pe.cliente and (pe.status != "CANCELADO" or contrato_assinado) %}
+  <h3>Contrato</h3>
+  {% if contrato_assinado %}
+  <p class="sucesso">Contrato assinado em {{ contrato_assinado.quando }} · código <strong>{{ contrato_assinado.codigo }}</strong></p>
+  {% else %}
+  <p class="aviso">O contrato ainda não foi assinado pela cliente.</p>
+  {% endif %}
+  <div class="acoes compacta">
+    <a class="botao {{ 'claro' if contrato_assinado else 'cheio' }}" href="/pedidos/{{ pe.id }}/contrato">✍ {{ "Ver contrato assinado" if contrato_assinado else "Contrato: cliente assina na tela" }}</a>
+  </div>
+  {% endif %}
+
+  <h3>Imprimir</h3>
+  <div class="acoes compacta">
+    <a class="botao claro pequeno" href="/pedidos/{{ pe.id }}/imprimir">🖨 Comprovante (folha A4)</a>
+    <a class="botao claro pequeno" href="/pedidos/{{ pe.id }}/imprimir?formato=80">🧾 Cupom térmico</a>
+    <a class="botao claro pequeno" href="/pedidos/{{ pe.id }}/pdf">⬇ Baixar PDF</a>
+    <a class="botao claro pequeno" href="/pedidos/{{ pe.id }}/checklist">📋 Checklist do vestido (código e QR)</a>
+    {% if pe.cliente %}
+    <form method="post" action="/pedidos/{{ pe.id }}/enviar-comprovante"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="botao claro pequeno">📲 Enviar para a cliente (WhatsApp e e-mail)</button></form>
+    {% endif %}
+  </div>
+
+  {% if compra_site %}
+  <h3 id="entrega">Pedido do site</h3>
+  <p>{% if compra_site.entrega == "RETIRADA" %}A cliente vai <strong>retirar na loja</strong>.
+     {% elif compra_site.entrega == "LOCAL" %}<strong>Entregar</strong> em {{ compra_site.cidade_entrega }} ({{ "motoboy" if compra_site.meio == "MOTOBOY" else "aplicativo" }}){% if compra_site.frete_centavos %} · frete pago {{ compra_site.frete_centavos|brl }}{% endif %}.
+     {% else %}<strong>Enviar</strong> por {{ compra_site.frete_servico }} ({{ compra_site.frete_prazo_dias }} dias úteis) · frete pago {{ compra_site.frete_centavos|brl }}.{% endif %}
+     {% if compra_site.status != "PAGA" %}<br><span class="selo alerta">Compra: {{ compra_site.status|lower }}</span> {{ compra_site.observacao or "" }}{% endif %}</p>
+  {% if compra_site.endereco %}{% set e = compra_site.endereco %}
+  <p class="endereco-entrega">{{ e.rua }}, {{ e.numero }}{% if e.complemento %} — {{ e.complemento }}{% endif %}<br>{{ e.bairro }} · {{ e.cidade }}/{{ e.uf }}{% if e.cep %} · CEP {{ e.cep[:5] }}-{{ e.cep[5:] }}{% endif %}</p>
+  {% endif %}
+  {% if compra_site.entrega == "ENVIO" and compra_site.status == "PAGA" %}
+  <form method="post" action="/pedidos/{{ pe.id }}/envio" class="linha-copias">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="etiqueta">Etiqueta Melhor Envio (id)</label><input id="etiqueta" name="etiqueta" type="text" maxlength="80" value="{{ compra_site.etiqueta_id or '' }}">
+    <label for="rastreio">Código de rastreio</label><input id="rastreio" name="rastreio" type="text" maxlength="60" value="{{ compra_site.rastreio or '' }}">
+    <button type="submit" class="botao claro pequeno">Guardar e avisar a cliente</button>
+  </form>
+  <p class="suave">Gere a etiqueta no <a href="https://melhorenvio.com.br/painel" target="_blank" rel="noopener">painel do Melhor Envio</a> com o endereço acima.</p>
+  {% endif %}
+  {% endif %}
+  {% if crediarios %}
+  <h3>Crediário da loja</h3>
+  <ul class="linha-tempo">
+    {% for c in crediarios %}<li><a href="/crediario/{{ c.id }}">📒 {{ c.valor_centavos|brl }} em {{ c.parcelas }}x · {{ c.pagas }} paga{{ "s" if c.pagas != 1 }}
+      · {{ {"ATIVO": "em dia/aberto", "QUITADO": "quitado", "CANCELADO": "cancelado"}[c.status] }} →</a>
+      {% if c.status == "ATIVO" %}<span class="acoes compacta"><a class="botao claro pequeno" href="/crediario/{{ c.id }}/carne?formato=a4">🖨 Carnê A4</a>
+        <a class="botao claro pequeno" href="/crediario/{{ c.id }}/carne?formato=80">🧾 Carnê térmica</a></span>{% endif %}</li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% if pagamentos %}
+  <h3>Pagamentos</h3>
+  <ul class="linha-tempo">
+    {% for t in pagamentos %}<li>{{ t.quando }} · {{ "Devolvido " if t.tipo == "SAIDA" else "" }}<strong>{{ t.valor_centavos|brl }}</strong>
+        {{ EM_FORMA[t.forma_pagamento] }}{% if t.parcelas > 1 %} {{ t.parcelas }}x{% endif %} · {{ t.quem }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+  <h3>Histórico</h3>
+  <ul class="linha-tempo">
+    {% for h in historico %}<li>{{ h.quando }} · <strong>{{ STATUS.get(h.para, h.para) }}</strong>{% if h.quem %} · {{ h.quem }}{% endif %}</li>{% endfor %}
+  </ul>
+
+  {% if cancelamento and cancelamento.regra is defined and pe.status == "CANCELADO" %}
+  <h3>Cancelamento</h3>
+  <ul class="linha-tempo">
+    <li>Regra: <strong>{{ cancelamento.regra or "—" }}</strong></li>
+    <li>A loja ficou com <strong>{{ cancelamento.multa|brl }}</strong></li>
+    <li>Devolver para a cliente: <strong>{{ cancelamento.devolver|brl }}</strong>{% if cancelamento.devolvido %} · já devolvido {{ cancelamento.devolvido|brl }}{% endif %}</li>
+  </ul>
+  {% if cancelamento.falta > 0 %}
+    {% if pode("pedidos.cancelar") %}
+    <form method="post" action="/pedidos/{{ pe.id }}/devolver" class="cartao-interno">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="chave" value="{{ nova_chave() }}">
+      <p class="aviso">Falta devolver {{ cancelamento.falta|brl }} para a cliente. Registre aqui quando devolver (sai do caixa).</p>
+      <label for="valor-devolver">Valor devolvido</label>
+      <input id="valor-devolver" name="valor" class="valor" inputmode="decimal" value="{{ cancelamento.falta|campo }}">
+      <div class="opcoes">
+        <label class="opcao"><input type="radio" name="forma" value="PIX" checked>Pix</label>
+        <label class="opcao"><input type="radio" name="forma" value="DINHEIRO">Dinheiro</label>
+      </div>
+      <p class="suave">Pago no cartão? Faça o estorno na maquininha (ou "Desfazer" no caixa do dia) e registre aqui como Pix.</p>
+      <div class="acoes"><button type="submit" class="botao saida">REGISTRAR DEVOLUÇÃO</button></div>
+    </form>
+    {% else %}<p class="aviso">Falta devolver {{ cancelamento.falta|brl }} para a cliente (a Dona ou a Gerente registra).</p>{% endif %}
+  {% endif %}
+  {% endif %}
+
+  {% if pode_cancelar %}
+  <h3>Cancelar pedido</h3>
+  {% set pv = cancelamento.previa if cancelamento else None %}
+  {% if pv %}
+  <p>Pela regra: <strong>{{ pv.regra }}</strong>. Pago até agora {{ pv.pago|brl }} → a loja fica com
+     <strong>{{ pv.multa|brl }}</strong> e devolve <strong>{{ pv.devolver|brl }}</strong> para a cliente.</p>
+  {% endif %}
+  <form method="post" action="/pedidos/{{ pe.id }}/cancelar">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="motivo">Motivo</label>
+    <input id="motivo" name="motivo" type="text" maxlength="150">
+    {% if pv and pv.multa > 0 %}
+    <label class="opcao"><input type="checkbox" name="sem_multa" value="1">Cancelar sem multa (devolver tudo)
+      <small>Use quando a culpa for da loja (ex.: peça danificada). Fica registrado quem decidiu.</small></label>
+    {% endif %}
+    <div class="acoes"><button type="submit" class="botao saida">CANCELAR ESTE PEDIDO</button></div>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

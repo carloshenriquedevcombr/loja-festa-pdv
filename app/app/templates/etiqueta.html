@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block titulo %}Etiqueta {{ p.sku }}{% endblock %}
+{% block voltar %}/pecas/{{ p.id }}{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito nao-imprimir">
+  <p>Confira a etiqueta e toque em imprimir. Na impressora de etiquetas, escolha o tamanho do papel dela.</p>
+  <div class="acoes"><button type="button" class="botao" data-imprimir>🖨 IMPRIMIR</button></div>
+</section>
+<div class="etiqueta">
+  <div class="sku-grande">{{ p.sku }}</div>
+  {{ barras }}
+  <div><strong>{{ p.nome }}</strong>{% if p.tamanho %} · Tam. {{ p.tamanho }}{% endif %}</div>
+  <div>{{ precos }}</div>
+</div>
+<script src="{{ estatico('imprimir.js') }}" defer></script>
+{% endblock %}

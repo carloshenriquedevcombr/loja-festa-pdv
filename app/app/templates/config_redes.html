@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block titulo %}Redes sociais{% endblock %}
+{% block voltar %}/{% endblock %}
+{% block conteudo %}
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+
+<section class="cartao">
+  <h2>Links das redes da loja</h2>
+  <p class="suave">Cole o link de cada rede (pode copiar da barra do navegador ou do "Compartilhar perfil" do celular).
+     Deixe em branco a que a loja não usa. Os links aparecem no rodapé e no topo do site.</p>
+  <form method="post" action="/config/redes" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% for campo, nome, dominios, exemplo in REDES %}
+    <label for="{{ campo }}">{{ nome }} <span class="dica">Ex.: {{ exemplo }}</span></label>
+    <input id="{{ campo }}" name="{{ campo }}" type="{{ 'text' if campo == 'instagram' else 'url' }}" maxlength="200"
+           inputmode="{{ 'text' if campo == 'instagram' else 'url' }}" autocomplete="off" value="{{ v[campo] or '' }}">
+    {% endfor %}
+    <div class="acoes"><button type="submit" class="botao">✓ SALVAR REDES SOCIAIS</button></div>
+  </form>
+  <p><a href="/site" target="_blank" rel="noopener">Ver como ficou no site →</a></p>
+</section>
+{% endblock %}

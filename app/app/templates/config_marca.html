@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block titulo %}Logo e marca{% endblock %}
+{% block voltar %}/config/site{% endblock %}
+{% block conteudo %}
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+<section class="cartao">
+  <h2>Logo da loja</h2>
+  <p class="suave">Aparece no topo e no rodapé do site, na entrada do sistema, nos comprovantes (folha, cupom e PDF),
+     no contrato, no checklist do vestido e nas etiquetas. Use PNG com fundo transparente (se for JPG com fundo branco,
+     o sistema tira o branco sozinho).</p>
+  <div class="marca-previa">
+    {% if m.logo %}<img src="/marca/{{ m.logo }}-logo.png" alt="Logo atual">
+      <img class="mono" src="/marca/{{ m.logo }}-mono.png" alt="Logo para impressora térmica"><span class="suave">Colorida · e como sai na impressora térmica</span>
+    {% else %}<p class="suave">Ainda sem logo: o site mostra o nome da loja escrito.</p>{% endif %}
+  </div>
+  <form method="post" action="/config/marca/logo" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="arquivo-logo">Escolher a logo (PNG, JPG ou WEBP, até 8 MB)</label>
+    <input id="arquivo-logo" name="arquivo" type="file" accept="image/png,image/jpeg,image/webp" required>
+    <div class="acoes"><button type="submit" class="botao">⬆ ENVIAR LOGO</button></div>
+  </form>
+  {% if m.logo %}<form method="post" action="/config/marca/remover"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="qual" value="logo">
+    <button type="submit" class="botao claro pequeno">Tirar a logo</button></form>{% endif %}
+</section>
+<section class="cartao">
+  <h2>Ícone (favicon)</h2>
+  <p class="suave">O desenho pequeno da aba do navegador e do atalho no celular. Melhor quadrado (ex.: só o símbolo ou as iniciais).
+     Se não enviar, o sistema usa a logo.</p>
+  <div class="marca-previa icones">
+    <img src="/icone-32.png" alt="Ícone 32" width="32" height="32"><img src="/icone-192.png" alt="Ícone 192" width="96" height="96">
+  </div>
+  <form method="post" action="/config/marca/icone" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="arquivo-icone">Escolher o ícone</label>
+    <input id="arquivo-icone" name="arquivo" type="file" accept="image/png,image/jpeg,image/webp" required>
+    <div class="acoes"><button type="submit" class="botao claro">⬆ ENVIAR ÍCONE</button></div>
+  </form>
+</section>
+{% endblock %}

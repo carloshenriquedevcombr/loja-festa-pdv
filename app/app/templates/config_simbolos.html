@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% import "_icones.html" as ic %}
+{% block titulo %}Símbolos das redes e cartões{% endblock %}
+{% block voltar %}/config/rodape{% endblock %}
+{% block conteudo %}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+<section class="cartao">
+  <p>No rodapé do site, cada rede social e cada forma de pagamento pode aparecer com o <strong>símbolo oficial</strong>
+    (o do Instagram, da Visa, do Pix…) em vez do nome.</p>
+  <p class="suave">Baixe o arquivo do <strong>kit de marca oficial</strong> de cada empresa — por exemplo, Instagram, Facebook
+    e WhatsApp em about.meta.com/brand/resources, e o Pix no site do Banco Central — e envie aqui em PNG, JPG ou WEBP
+    (de preferência com fundo transparente). Cada empresa tem regras de uso do símbolo; o sistema não desenha nem altera
+    os símbolos. Sem arquivo, aparece o nome escrito.</p>
+</section>
+<div class="grade-simbolos">
+{% for i in itens %}
+  <section class="bloco-painel simbolo-item" id="{{ i.chave }}">
+    <p class="suave">{{ i.tipo }}</p>
+    <h2>{{ i.nome }}</h2>
+    <div class="simbolo-previa">
+      {% if i.arquivo %}<img src="/simbolo/{{ i.arquivo }}.png" alt="{{ i.nome }}">
+      {% elif i.generico %}{{ ic.icone(i.generico) }} <span>{{ i.nome }}</span>
+      {% else %}<span class="selo-mini">{{ i.nome }}</span>{% endif %}
+    </div>
+    <form method="post" action="/config/simbolos/{{ i.chave }}" enctype="multipart/form-data">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label for="arq-{{ i.chave }}">Arquivo oficial</label>
+      <input id="arq-{{ i.chave }}" name="arquivo" type="file" accept="image/png,image/jpeg,image/webp">
+      <div class="acoes compacta">
+        <button type="submit" class="botao pequeno" data-dica="Envia o símbolo; ele passa a aparecer no rodapé do site.">Enviar</button>
+        {% if i.arquivo %}<button type="submit" name="acao" value="tirar" class="botao claro pequeno" data-dica="Tira o símbolo e volta a mostrar o nome escrito.">Voltar ao nome</button>{% endif %}
+      </div>
+    </form>
+  </section>
+{% endfor %}
+</div>
+{% endblock %}

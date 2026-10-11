@@ -1,0 +1,68 @@
+{% extends "site/base.html" %}
+{% import "site/_card.html" as c %}
+{% block titulo %}{{ titulo }} · {{ loja.nome }}{% endblock %}
+{% macro chip(rotulo, campo, valor) %}
+  {% set ativo = filtros[campo] == valor %}
+  <a class="chip {{ 'ativo' if ativo }}" href="{{ url(**{campo: ('' if ativo else valor)}) }}" {% if ativo %}aria-current="true"{% endif %}>{{ rotulo }}</a>
+{% endmacro %}
+{% block conteudo %}
+<div class="colecao">
+  <nav class="trilha" aria-label="Você está em"><a href="/site">Início</a>{% for nome, link in trilha %} <span aria-hidden="true">/</span> <a href="{{ link }}">{{ nome }}</a>{% endfor %}</nav>
+  <h1 class="titulo-pagina">{{ titulo }}</h1>
+  {% if subs %}
+  <div class="subocasioes">
+    {% for s in subs %}<a class="chip {{ 'ativo' if s.slug == sub }}" href="/site/c/{{ grupo }}/{{ s.slug }}">{{ s.nome }}</a>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="colecao-corpo">
+    <input type="checkbox" id="abrir-filtros" class="alternador" aria-label="Mostrar os filtros">
+    <label for="abrir-filtros" class="botao-filtros">Filtrar e ordenar</label>
+    <aside class="filtros" aria-label="Filtros">
+      <form method="get" action="{{ request.url.path }}" class="filtro-data">
+        {% for k, v in filtros.items() if v and k != "data" %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+        <label for="data">Data da sua festa</label>
+        <input id="data" name="data" type="date" min="{{ hoje.isoformat() }}" value="{{ filtros.data }}">
+        <button type="submit" class="botao-site pequeno">Ver livres nessa data</button>
+        {% if dia %}<a class="limpar" href="{{ url(data='') }}">Tirar a data</a>{% endif %}
+      </form>
+      <h2>Quero</h2>
+      <div class="chips">{{ chip("Alugar", "uso", "alugar") }}{{ chip("Comprar", "uso", "comprar") }}</div>
+      <h2>Para</h2>
+      <div class="chips">{% for k, v in PUBLICO.items() if k != "UNISSEX" %}{{ chip(v, "publico", k) }}{% endfor %}
+        {% for k, v in FAIXA.items() %}{{ chip(v, "faixa", k) }}{% endfor %}</div>
+      {% if tamanhos %}<h2>Tamanho</h2>
+      <div class="chips">{% for t in tamanhos %}{{ chip(t, "tamanho", t) }}{% endfor %}</div>{% endif %}
+      {% if cores %}<h2>Cor</h2>
+      <div class="chips">{% for cor in cores %}{{ chip(cor, "cor", cor) }}{% endfor %}</div>{% endif %}
+      <h2>Comprimento</h2>
+      <div class="chips">{% for k, v in COMPRIMENTO.items() %}{{ chip(v, "comprimento", k) }}{% endfor %}</div>
+      <h2>Ordenar</h2>
+      <div class="chips">
+        {% for k, v in [("novidades", "Novidades"), ("menor", "Menor preço"), ("maior", "Maior preço")] %}
+          <a class="chip {{ 'ativo' if filtros.ordem == k }}" href="{{ url(ordem=k) }}">{{ v }}</a>{% endfor %}
+      </div>
+    </aside>
+
+    <div class="resultado">
+      <p class="contagem">{{ total }} peça{{ "s" if total != 1 }}{% if dia %} livre{{ "s" if total != 1 }} em {{ dia|data }}{% endif %}</p>
+      {% if pecas %}
+        <div class="grade-pecas">{% for p in pecas %}{{ c.card(p) }}{% endfor %}</div>
+        {% if paginas > 1 %}
+        <nav class="paginas" aria-label="Páginas">
+          {% if pagina > 1 %}<a href="{{ url(pagina=pagina - 1) }}">← Anterior</a>{% endif %}
+          <span>Página {{ pagina }} de {{ paginas }}</span>
+          {% if pagina < paginas %}<a href="{{ url(pagina=pagina + 1) }}">Próxima →</a>{% endif %}
+        </nav>
+        {% endif %}
+      {% else %}
+        <div class="vazio-site">
+          <p>Não encontramos peças com esses filtros.</p>
+          <a class="botao-site contorno" href="{{ request.url.path }}">Limpar filtros</a>
+          {% if whatsapp %}<a class="botao-site" href="{{ whatsapp }}" target="_blank" rel="noopener">Pedir ajuda no WhatsApp</a>{% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

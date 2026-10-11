@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block titulo %}Agenda{% endblock %}
+{% macro compromisso(it, mostrar_dia=False) %}
+  <div class="item">
+    <span class="hora-grande">{{ it.hora }}</span>
+    <span class="principal"><span class="titulo-item">{{ COMPROMISSOS[it.tipo] }} · {{ it.cliente or "—" }}</span><br>
+      <span class="suave">{% if mostrar_dia %}{{ it.dia|data }} · {% endif %}{% if it.sku %}<span class="sku">{{ it.sku }}</span> {{ it.peca }}{% endif %}
+        {% if it.telefone %} · {{ it.telefone|telefone }}{% endif %}</span>
+      {% if it.observacao %}<br><span class="suave">{{ it.observacao }}</span>{% endif %}</span>
+    {% if it.status == "FEITO" %}<span class="selo ok">Feito</span>
+    {% elif it.status == "FALTOU" %}<span class="selo alerta">Faltou</span>
+    {% elif it.status == "REMARCADO" %}<span class="selo info">Remarcado</span>{% endif %}
+    {% if it.status != "FEITO" %}
+    <div class="acoes compacta">
+      {% if it.pedido_id and pode("pedidos.ver") %}<a class="botao pequeno" href="/pedidos/{{ it.pedido_id }}">Abrir pedido</a>{% endif %}
+      {% if not it.pedido_id and it.cliente_id and pode("clientes.ver") %}<a class="botao pequeno" href="/clientes/{{ it.cliente_id }}">Ficha da cliente</a>{% endif %}
+      {% if it.whatsapp %}<a class="botao claro pequeno" href="{{ it.whatsapp }}" target="_blank" rel="noopener">💬 WhatsApp</a>{% endif %}
+      {% if it.pedido_id and pode("agenda.editar") %}<a class="botao claro pequeno" href="/agenda/{{ it.id }}/remarcar">📅 Remarcar</a>{% endif %}
+      {% if it.tipo in ("PROVA_1", "PROVA_2", "VISITA") and pode("medidas.ver") and it.cliente_id %}
+        <a class="botao claro pequeno" href="/clientes/{{ it.cliente_id }}/medidas">📏 Medidas</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+{% endmacro %}
+{% block conteudo %}
+{% if atrasados %}
+<section class="cartao">
+  <h2>⚠ Ficaram para trás ({{ atrasados|length }})</h2>
+  <p class="suave">Compromissos que já passaram e não foram marcados como feitos. Remarque ou abra o pedido.</p>
+  <div class="lista">{% for it in atrasados %}{{ compromisso(it, True) }}{% endfor %}</div>
+</section>
+{% endif %}
+
+<section class="cartao">
+  <div class="acoes compacta">
+    <a class="botao claro pequeno" href="/agenda?dia={{ anterior.isoformat() }}">← Semana anterior</a>
+    {% if inicio != hoje %}<a class="botao claro pequeno" href="/agenda">Hoje</a>{% endif %}
+    <a class="botao claro pequeno" href="/agenda?dia={{ seguinte.isoformat() }}">Próxima semana →</a>
+  </div>
+  {% for n in range(7) %}
+    {% set dia = inicio + timedelta(days=n) %}
+    <h2 class="espaco">{{ "Hoje" if dia == hoje else ("Amanhã" if (dia - hoje).days == 1 else DIAS_SEMANA[dia.weekday()]|capitalize) }},
+      {{ dia|data }}</h2>
+    {% if dias.get(dia) %}
+      <div class="lista">{% for it in dias[dia] %}{{ compromisso(it) }}{% endfor %}</div>
+    {% else %}
+      <p class="suave vazio">Nada marcado.</p>
+    {% endif %}
+  {% endfor %}
+</section>
+{% endblock %}

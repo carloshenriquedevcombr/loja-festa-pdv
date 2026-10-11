@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}{{ "Cadastrar cliente" if nova else "Editar cliente" }}{% endblock %}
+{% block voltar %}{{ "/clientes" if nova else "/clientes/" ~ c.id }}{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+  {% if existente %}<p><a class="botao claro cheio" href="/clientes/{{ existente }}">Abrir a ficha que já existe →</a></p>{% endif %}
+  <form method="post" action="{{ '/clientes/nova' if nova else '/clientes/' ~ c.id ~ '/editar' }}" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="nome">Nome completo</label>
+    <input id="nome" name="nome" type="text" maxlength="120" value="{{ v.nome or '' }}" autocomplete="off">
+    <label for="telefone">Telefone com DDD <span class="dica">Ex.: (19) 99999-9999 · usado para lembrete no WhatsApp</span></label>
+    <input id="telefone" name="telefone" type="tel" value="{{ v.telefone|telefone }}" autocomplete="off">
+    <label for="cpf">CPF <span class="dica">Opcional</span></label>
+    <input id="cpf" name="cpf" type="text" inputmode="numeric" maxlength="14" value="{{ v.cpf|cpf }}" autocomplete="off">
+    <label for="email">E-mail <span class="dica">Opcional</span></label>
+    <input id="email" name="email" type="email" maxlength="120" value="{{ v.email or '' }}" autocomplete="off">
+    <label for="endereco">Endereço <span class="dica">Opcional. Vai no contrato de aluguel</span></label>
+    <input id="endereco" name="endereco" type="text" maxlength="200" value="{{ v.endereco or '' }}" autocomplete="off">
+    <label for="observacoes">Observações <span class="dica">Opcional. Ex.: prefere provas à tarde</span></label>
+    <textarea id="observacoes" name="observacoes" maxlength="500">{{ v.observacoes or '' }}</textarea>
+    <span class="rotulo">Autorização (LGPD)</span>
+    <div class="opcoes">
+      <label class="opcao"><input type="checkbox" name="lgpd" value="1" {% if v.lgpd == "1" %}checked{% endif %}>
+        A cliente autorizou a loja a guardar estes dados<small>para contato sobre o pedido</small></label>
+    </div>
+    <div class="acoes"><button type="submit" class="botao">{{ "✓ CADASTRAR" if nova else "✓ SALVAR" }}</button></div>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "site/base.html" %}
+{% block titulo %}Minha conta · {{ loja.nome }}{% endblock %}
+{% block cabeca %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block antes_rodape %}{% endblock %}
+{% block conteudo %}
+<section class="bloco">
+  <h1 class="titulo-pagina">Olá, {{ conta.nome.split()[0] }}</h1>
+  {% if ok %}<p class="ok-site" role="status">{{ ok }}</p>{% endif %}
+
+  <h2 class="titulo-bloco">Meus pedidos</h2>
+  {% if pedidos %}
+  <table class="tabela-site">
+    <thead><tr><th>Peça</th><th>Tipo</th><th>Datas</th><th>Situação</th><th>Falta pagar</th><th></th></tr></thead>
+    <tbody>
+    {% for p in pedidos %}
+      <tr><td>{{ p.peca }}<br><span class="suave">Ref. {{ p.sku }}</span></td>
+        <td>{{ "Aluguel" if p.tipo == "ALUGUEL" else "Compra" }}</td>
+        <td>{% if p.data_retirada %}Retirada {{ p.data_retirada|data }}{% endif %}{% if p.data_devolucao %}<br>Devolução {{ p.data_devolucao|data }}{% endif %}</td>
+        <td><span class="selo-site">{{ STATUS_SITE.get(p.status, p.status) }}</span></td>
+        <td>{{ p.falta|brl if p.falta > 0 and p.status != "CANCELADO" else "—" }}</td>
+        <td>{% if p.token_publico %}<a href="/site/meu-pedido/{{ p.token_publico }}">Ver pedido</a><br>{% endif %}
+            <a href="/site/contrato?codigo={{ p.verificar }}">Verificar{{ " contrato" if p.contrato }}</a></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="centro suave">Você ainda não tem pedidos. <a href="/site/colecao">Veja a coleção</a>.</p>{% endif %}
+
+  {% if compras %}
+  <h2 class="titulo-bloco">Compras pelo site</h2>
+  <table class="tabela-site">
+    <thead><tr><th>Quando</th><th>Valor</th><th>Entrega</th><th>Situação</th></tr></thead>
+    <tbody>{% for c in compras %}
+      <tr><td>{{ c.quando }}</td><td>{{ c.valor_total_centavos|brl }}{% if c.forma_paga %}<br><span class="suave">{{ {"PIX": "Pix", "CREDITO": "Crédito", "DEBITO": "Débito"}[c.forma_paga] }}</span>{% endif %}</td>
+        <td>{{ {"RETIRADA": "Retirar na loja", "LOCAL": "Entrega na cidade", "ENVIO": "Envio"}[c.entrega] }}{% if c.rastreio %}<br>Rastreio {{ c.rastreio }}{% endif %}</td>
+        <td>{{ STATUS_COMPRA[c.status] }}{% if c.pode_pagar %}<br><a href="/site/sacola/pagar/{{ c.id }}">Pagar agora</a>{% endif %}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+  {% endif %}
+
+  <div class="abas-conta">
+    <div class="caixa-site" id="dados">
+      <h2>Meus dados</h2>
+      <p>WhatsApp: {{ dados.telefone|telefone if dados.telefone else "—" }}<br>E-mail: {{ dados.email or "—" }}</p>
+      <p class="suave">Para mudar nome, telefone ou endereço, fale com a loja.</p>
+      <p class="aviso-pagamento">🔒 Não guardamos dados de cartão, Pix ou boleto. Cada pagamento é feito na página segura do Mercado Pago.</p>
+    </div>
+    <div class="caixa-site" id="senha">
+      <h2>{{ "Trocar a senha" if dados.tem_senha else "Criar senha" }}</h2>
+      <form method="post" action="/site/conta/senha" class="form-site" novalidate>
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        {% if dados.tem_senha %}<label for="atual">Senha atual</label><input id="atual" name="atual" type="password" autocomplete="current-password">{% endif %}
+        {% if not dados.email %}<label for="email">E-mail para entrar</label><input id="email" name="email" type="email" autocomplete="email">{% endif %}
+        <label for="nova">Senha nova</label><input id="nova" name="nova" type="password" autocomplete="new-password" maxlength="32">
+        <button type="submit" class="botao-site">Guardar senha</button>
+      </form>
+    </div>
+  </div>
+  <div class="acoes-peca centro">
+    <form method="post" action="/site/conta/sair"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" class="botao-site contorno">Sair</button></form>
+  </div>
+  <details class="descricao">
+    <summary>Apagar meus dados (LGPD)</summary>
+    <p>A conta é desligada na hora e a loja apaga seus dados em até 15 dias, menos o que a lei manda guardar (contratos e notas).</p>
+    <form method="post" action="/site/conta/excluir"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="link-remover">Quero apagar meus dados</button></form>
+  </details>
+</section>
+{% endblock %}

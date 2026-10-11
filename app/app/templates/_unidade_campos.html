@@ -1,0 +1,14 @@
+<label for="{{ pre }}-nome">Nome <span class="dica">Ex.: Loja Centro</span></label>
+<input id="{{ pre }}-nome" name="nome" type="text" maxlength="80" value="{{ v.nome or '' }}" required>
+<label for="{{ pre }}-endereco">Endereço <span class="dica">Rua, número, bairro</span></label>
+<input id="{{ pre }}-endereco" name="endereco" type="text" maxlength="200" value="{{ v.endereco or '' }}" required>
+<label for="{{ pre }}-cidade">Cidade/UF</label>
+<input id="{{ pre }}-cidade" name="cidade" type="text" maxlength="80" value="{{ v.cidade or '' }}">
+<div class="par">
+  <div><label for="{{ pre }}-telefone">Telefone</label><input id="{{ pre }}-telefone" name="telefone" type="tel" value="{{ v.telefone|telefone if v.telefone else '' }}"></div>
+  <div><label for="{{ pre }}-whatsapp">WhatsApp</label><input id="{{ pre }}-whatsapp" name="whatsapp" type="tel" value="{{ v.whatsapp|telefone if v.whatsapp else '' }}"></div>
+</div>
+<label for="{{ pre }}-horario">Horário <span class="dica">Ex.: Seg a sex 9h às 18h · Sáb 9h às 13h</span></label>
+<input id="{{ pre }}-horario" name="horario" type="text" maxlength="120" value="{{ v.horario or '' }}">
+<label for="{{ pre }}-mapa_link">Link do Google Maps <span class="dica">Opcional. No Google Maps: Compartilhar → Copiar link. Sem ele, o mapa usa o endereço.</span></label>
+<input id="{{ pre }}-mapa_link" name="mapa_link" type="url" maxlength="300" value="{{ v.mapa_link or '' }}">

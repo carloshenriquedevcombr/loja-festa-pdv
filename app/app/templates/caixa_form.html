@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% import "_formulario.html" as f %}
+{% set base = base or "/caixa/" ~ modo %}
+{% block titulo %}{{ m.titulo }}{% endblock %}
+{% block voltar %}{{ "/pedidos/" ~ pe.id if pe else "/" }}{% endblock %}
+{% block conteudo %}
+{% if modo == "receber" %}
+<section class="cartao estreito">
+  <form method="get" action="/caixa/receber" class="busca-receber" role="search">
+    <label for="q" class="rotulo">É de um pedido ou de uma cliente? Procure aqui</label>
+    <input id="q" name="q" type="search" maxlength="60" value="{{ q or '' }}" placeholder="Nome, telefone, CPF, código da peça ou do pedido">
+    <button type="submit" class="botao claro">🔍 PROCURAR</button>
+  </form>
+  {% if q %}
+    {% if achados and (achados.pedidos or achados.parcelas) %}
+      {% if achados.pedidos %}
+        <p class="rotulo">Pedidos com valor a receber</p>
+        <ul class="achados">
+          {% for p in achados.pedidos %}
+          <li><a href="/pedidos/{{ p.id }}/receber"><span><span class="sku">{{ p.sku }}</span> {{ p.peca }}<br><small>{{ p.cliente or "Venda sem cadastro" }}{% if p.data_retirada %} · retirada {{ p.data_retirada|data }}{% endif %}</small></span>
+            <span class="valor-achado">falta {{ p.saldo|brl }} →</span></a></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      {% if achados.parcelas %}
+        <p class="rotulo">Crediário da loja (próxima parcela)</p>
+        <ul class="achados">
+          {% for c in achados.parcelas %}
+          <li><a href="/crediario/{{ c.id }}/parcela/{{ c.numero }}"><span>📒 {{ c.cliente }}<br><small class="{{ 'vencida' if c.vencida }}">Parcela {{ c.numero }} de {{ c.parcelas }} · {{ "venceu" if c.vencida else "vence" }} {{ c.vencimento|data }}</small></span>
+            <span class="valor-achado">{{ c.valor_centavos|brl }} →</span></a></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endif %}
+    {% if achados and achados.clientes %}
+      <p class="rotulo">Serviço avulso (limpeza, conserto, taxa…) para a cliente</p>
+      <ul class="achados">
+        {% for c in achados.clientes %}
+        <li><a href="/caixa/receber?cliente={{ c.id }}"><span>👤 {{ c.nome }}{% if c.telefone_fim %}<br><small>tel. final {{ c.telefone_fim }}</small>{% endif %}</span>
+          <span class="valor-achado">escolher →</span></a></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% if not achados or not (achados.pedidos or achados.parcelas or achados.clientes) %}
+      <p class="suave">Nada encontrado com “{{ q }}”. Confira o nome ou <a href="/clientes/nova">cadastre a cliente</a>.</p>
+    {% endif %}
+  {% endif %}
+</section>
+{% endif %}
+
+{% if modo == "receber" and not cliente_esc %}
+<section class="cartao estreito">
+  {{ f.erro_box(erro) }}
+  <p><strong>Todo dinheiro que entra tem um motivo no sistema:</strong> o pedido, a parcela do crediário ou um serviço
+    cadastrado para a cliente. Procure acima pelo nome, telefone, CPF ou código do pedido.</p>
+  {% if pode("servicos.editar") %}<p class="suave">Serviços cadastrados (limpeza, conserto, taxas): <a href="/servicos">ver e cadastrar</a>.</p>{% endif %}
+</section>
+{% else %}
+<section class="cartao estreito">
+  {{ f.erro_box(erro) }}
+  {% if pe %}
+    <p><span class="sku">{{ pe.sku }}</span> {{ pe.peca }}{% if pe.cliente %} · {{ pe.cliente }}{% endif %}</p>
+    <p class="grande">Falta pagar: {{ pe.saldo|brl }}</p>
+  {% endif %}
+  <form method="post" action="{{ base }}/conferir" novalidate{% if modo == "pagar" %} enctype="multipart/form-data"{% endif %}>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="chave" value="{{ v.chave }}">
+
+    <label for="valor">{{ "Quanto você pagou?" if modo == "pagar" else "Quanto recebeu?" }}
+      <span class="dica">Exemplo: 150,00</span></label>
+    <input id="valor" name="valor" class="valor" inputmode="decimal" autocomplete="off" value="{{ v.valor or '' }}" autofocus>
+    {% if modo == "pagar" and not ilimitada %}
+      <p class="suave">Seu limite por saída é {{ teto|brl }}. Acima disso, quem lança é a Gerente ou a Dona.</p>
+    {% endif %}
+
+    {{ f.pagamento(v, formas, maquininhas, max_parcelas,
+                   "Como você pagou?" if modo == "pagar" else "Como a cliente pagou?", modo=modo_pagamento) }}
+
+    {% if modo == "pagar" %}
+      <div class="despesa-detalhes">
+        <label for="fornecedor">Para quem pagou? <span class="dica">Opcional.{% if pode("fornecedores.editar") %} <a href="/fornecedores/novo">Cadastrar fornecedor</a>{% endif %}</span></label>
+        <select id="fornecedor" name="fornecedor">
+          <option value="">— Sem fornecedor cadastrado —</option>
+          {% for fo in fornecedores %}<option value="{{ fo.id }}" {% if v.fornecedor == fo.id %}selected{% endif %}>{{ fo.nome }}{% if fo.categoria %} ({{ fo.categoria }}){% endif %}</option>{% endfor %}
+        </select>
+
+        <label for="categoria">Tipo de despesa</label>
+        <select id="categoria" name="categoria">
+          <option value="">— Escolha —</option>
+          {% for c in CATEGORIAS %}<option {% if v.categoria == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+        </select>
+
+        <label for="descricao">O que foi pago? <span class="dica">Ex.: linha e botões, conta de luz, lavanderia</span></label>
+        <input id="descricao" name="descricao" type="text" maxlength="200" value="{{ v.descricao or '' }}">
+
+        <label for="documento">Nº da nota, boleto ou recibo <span class="dica">Opcional</span></label>
+        <input id="documento" name="documento" type="text" maxlength="60" value="{{ v.documento or '' }}">
+
+        {% if v.anexo %}
+          <input type="hidden" name="anexo" value="{{ v.anexo }}">
+          <p class="nota-anexada">✓ Foto da nota já anexada.</p>
+        {% else %}
+          <label for="nota">Foto da nota ou do comprovante <span class="dica">Opcional. Tire a foto pelo celular.</span></label>
+          <input id="nota" name="nota" type="file" accept="image/jpeg,image/png,image/webp" capture="environment">
+        {% endif %}
+      </div>
+    {% elif modo == "receber" %}
+      <input type="hidden" name="cliente" value="{{ cliente_esc.id }}">
+      <p class="cliente-escolhida">👤 <strong>{{ cliente_esc.nome }}</strong> <a href="/caixa/receber">trocar</a></p>
+      <label for="servico">Serviço <span class="dica">O que a cliente está pagando</span></label>
+      <select id="servico" name="servico">
+        <option value="">— Escolha —</option>
+        {% for sv in servicos %}<option value="{{ sv.id }}" {% if v.servico == sv.id %}selected{% endif %}>{{ sv.nome }}{% if sv.preco_centavos %} ({{ sv.preco_centavos|brl }}){% endif %}</option>{% endfor %}
+      </select>
+      <label for="descricao">Detalhe <span class="dica">Opcional. Ex.: barra da calça, vestido azul</span></label>
+      <input id="descricao" name="descricao" type="text" maxlength="200" value="{{ v.descricao or '' }}">
+    {% endif %}
+
+    <div class="acoes"><button type="submit" class="botao {{ m.cor }}">CONTINUAR →</button></div>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

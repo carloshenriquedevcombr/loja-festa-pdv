@@ -1,0 +1,9 @@
+{% extends "site/base.html" %}
+{% block titulo %}Peça não encontrada · {{ loja.nome }}{% endblock %}
+{% block conteudo %}
+<div class="pagina-estreita centro">
+  <h1 class="titulo-pagina">Esta peça não está mais disponível</h1>
+  <p>Ela pode ter sido vendida ou saído da vitrine. Veja outras opções:</p>
+  <p><a class="botao-site" href="/site/colecao">Ver a coleção</a></p>
+</div>
+{% endblock %}

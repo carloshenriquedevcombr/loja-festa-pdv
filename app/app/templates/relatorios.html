@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}Relatórios{% endblock %}
+{% block titulo_pagina %}Relatório de {{ inicio.strftime("%m/%Y") }}{% endblock %}
+{% block conteudo %}
+<div class="acoes compacta">
+  <a class="botao claro pequeno" href="/relatorios?mes={{ anterior }}">← Mês anterior</a>
+  <a class="botao claro pequeno" href="/relatorios?mes={{ seguinte }}">Mês seguinte →</a>
+</div>
+<section class="painel-resumo espaco">
+  <div class="numero vidro"><div class="rotulo-num">Entrou no mês</div><div class="valor-num">{{ total_entrou|brl }}</div></div>
+  <div class="numero vidro"><div class="rotulo-num">Saiu no mês</div><div class="valor-num">{{ total_saiu|brl }}</div></div>
+  <div class="numero vidro"><div class="rotulo-num">Resultado do caixa</div><div class="valor-num">{{ (total_entrou - total_saiu)|brl }}</div></div>
+  <div class="numero vidro"><div class="rotulo-num">A receber (pedidos em aberto)</div><div class="valor-num">{{ a_receber|brl }}</div></div>
+</section>
+<section class="cartao">
+  <h2>Pedidos do mês</h2>
+  <p>{{ pedidos.alugueis }} aluguéis · {{ pedidos.vendas }} vendas · {{ pedidos.ajustes|brl }} em serviços de ajuste</p>
+  <h2>Por forma de pagamento</h2>
+  <div class="tabela-vidro"><table>
+    <thead><tr><th>Forma</th><th class="num">Líquido no caixa</th><th class="num">Juros cobrados</th></tr></thead>
+    {% for f in formas %}<tr><td>{{ FORMAS[f.forma] }}</td><td class="num">{{ f.liquido|brl }}</td><td class="num">{{ f.juros|brl }}</td></tr>
+    {% else %}<tr><td colspan="3">Sem lançamentos neste mês.</td></tr>{% endfor %}
+  </table></div>
+  <h2>Dia a dia</h2>
+  <div class="tabela-vidro"><table>
+    <thead><tr><th>Dia</th><th class="num">Entrou</th><th class="num">Saiu</th><th>Entradas</th></tr></thead>
+    {% for d in dias %}<tr><td><a href="/caixa?dia={{ d.dia.isoformat() }}">{{ d.dia|data }}</a></td>
+      <td class="num">{{ (d.entrou or 0)|brl }}</td><td class="num">{{ (d.saiu or 0)|brl }}</td>
+      <td><meter min="0" max="{{ maior }}" value="{{ d.entrou or 0 }}">{{ (d.entrou or 0)|brl }}</meter></td></tr>
+    {% else %}<tr><td colspan="4">Sem lançamentos neste mês.</td></tr>{% endfor %}
+  </table></div>
+</section>
+{% endblock %}

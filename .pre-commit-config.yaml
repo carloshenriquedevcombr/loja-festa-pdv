@@ -1,0 +1,6 @@
+# Bloqueia commits com senhas/chaves. Instale uma vez: pip install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.24.2
+    hooks:
+      - id: gitleaks

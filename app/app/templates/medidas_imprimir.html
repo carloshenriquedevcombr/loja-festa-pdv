@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% import "_figuras.html" as fig %}
+{% block titulo %}Ficha de medidas · {{ c.nome }}{% endblock %}
+{% block voltar %}/clientes/{{ c.id }}/medidas{% endblock %}
+{% block conteudo %}
+<section class="cartao nao-imprimir">
+  <div class="acoes compacta">
+    <button type="button" class="botao" data-imprimir>🖨 IMPRIMIR</button>
+    {% for codigo, f in FICHAS.items() %}<a class="botao claro pequeno" href="?ficha={{ codigo }}">Ficha {{ f.nome|lower }}</a>{% endfor %}
+    <a class="botao claro pequeno" href="?ficha={{ ficha }}&amp;em_branco=1">Em branco</a>
+  </div>
+</section>
+<article class="papel papel-a4 ficha-papel">
+  <header class="ficha-papel-topo">
+    <div>{% set mc = marca() %}{% if mc.logo %}<img class="papel-logo esquerda" src="/marca/{{ mc.logo }}-logo.png" alt="">{% endif %}<div class="papel-loja">{{ loja }}</div><div>Ficha de medidas · {{ FICHAS[ficha].nome|lower }}</div></div>
+    <div class="direita">Cliente: <strong>{{ c.nome }}</strong>{% if c.telefone %}<br>{{ c.telefone|telefone }}{% endif %}
+      {% if pedido %}<br>Peça: {{ pedido.sku }} · {{ pedido.nome }}{% if pedido.data_retirada %} · retirada {{ pedido.data_retirada|data }}{% endif %}{% endif %}</div>
+  </header>
+  <div class="ficha-papel-corpo">
+    <div class="ficha-papel-figura">{{ fig.figura(ficha) }}</div>
+    {% set pontos = FICHAS[ficha].pontos %}
+    {% set metade = ((pontos|length + (1 if ficha == "FEMININO" else 0)) / 2)|round(0, "ceil")|int %}
+    <div class="ficha-tabelas">
+    {% for parte in [pontos[:metade], pontos[metade:]] %}
+    <table class="papel-tabela">
+      <thead><tr><th>Nº</th><th>Medida</th><th class="num">{{ ("Em " ~ m.quando[:5]) if m else "Medida" }}</th><th>1ª prova</th><th>2ª prova</th></tr></thead>
+      <tbody>
+      {% for n, chave, nome, dica, minimo, maximo, costas in parte %}
+        <tr><td>{{ n }}</td><td>{{ nome }}{% if costas %} (costas){% endif %}</td>
+            <td class="num">{{ (numero(m.valores[chave]) ~ " cm") if m and chave in m.valores else "" }}</td><td></td><td></td></tr>
+      {% endfor %}
+      {% if loop.last and ficha == "FEMININO" %}<tr><td>👠</td><td>Salto usado</td><td class="num">{{ (numero(m.salto_cm) ~ " cm") if m and m.salto_cm else "" }}</td><td></td><td></td></tr>{% endif %}
+      </tbody>
+    </table>
+    {% endfor %}
+    </div>
+  </div>
+  <div class="ficha-papel-obs">
+    <strong>Observações da costura:</strong> {{ m.observacoes if m and m.observacoes else "" }}
+    <div class="linha-escrever"></div><div class="linha-escrever"></div><div class="linha-escrever"></div>
+  </div>
+  <div class="papel-assinaturas"><div class="papel-assina">Costureira</div><div class="papel-assina">Cliente</div></div>
+</article>
+<script src="{{ estatico('imprimir.js') }}" defer></script>
+{% endblock %}

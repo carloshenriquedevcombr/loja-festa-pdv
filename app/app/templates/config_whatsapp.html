@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block titulo %}WhatsApp, e-mail e horário{% endblock %}
+{% block voltar %}/config{% endblock %}
+{% block cabeca %}{% if cfg and cfg.status in ("CONECTANDO", "CODIGO", "QRCODE") %}<meta http-equiv="refresh" content="6">{% endif %}{% endblock %}
+{% block conteudo %}
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+{% if ok %}<p class="sucesso" role="status">{{ ok }}</p>{% endif %}
+
+<section class="cartao" id="conexao">
+  <h2>WhatsApp da loja</h2>
+  {% if cfg %}
+    {% if cfg.status == "CONECTADO" %}
+      <p class="sucesso">Conectado · número {{ cfg.numero }}. Os avisos e o chat do site estão funcionando.</p>
+    {% elif cfg.codigo and cfg.status in ("CODIGO", "QRCODE", "CONECTANDO") %}
+      <div class="codigo-whatsapp">
+        <p>Digite este código no celular da loja:</p>
+        <p class="codigo-grande">{{ cfg.codigo }}</p>
+        <ol>
+          <li>Abra o <strong>WhatsApp</strong> no celular da loja.</li>
+          <li>Toque em <strong>Mais opções ⋮</strong> (Android) ou <strong>Configurações</strong> (iPhone).</li>
+          <li>Toque em <strong>Dispositivos conectados</strong> e depois em <strong>Conectar dispositivo</strong>.</li>
+          <li>Toque em <strong>Conectar com número de telefone</strong> e digite o código acima.</li>
+        </ol>
+        <p class="suave">Esta tela se atualiza sozinha. Quando conectar, aparece "Conectado".</p>
+      </div>
+    {% elif cfg.status == "QRCODE" and cfg.qrcode %}
+      <p>Leia este QR code no WhatsApp do celular da loja (Dispositivos conectados → Conectar dispositivo):</p>
+      <img class="qrcode" src="{{ cfg.qrcode }}" alt="QR code para conectar o WhatsApp">
+    {% elif cfg.status == "CONECTANDO" %}
+      <p class="aviso">Preparando a conexão… o código aparece aqui em alguns segundos.</p>
+    {% else %}
+      <p class="aviso">Desconectado. Toque em "Gerar código" para conectar.</p>
+    {% endif %}
+    <div class="acoes compacta">
+      <form method="post" action="/config/whatsapp/conectar"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="botao">🔗 Gerar código de conexão</button></form>
+      {% if cfg.status == "CONECTADO" %}
+      <form method="post" action="/config/whatsapp/teste"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="botao claro">Mandar teste para mim</button></form>
+      <form method="post" action="/config/whatsapp/desconectar"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="botao claro">Desconectar</button></form>
+      {% endif %}
+    </div>
+    <p class="suave espaco">Últimos 7 dias: {{ fila.get("ENVIADA", 0) }} enviadas · {{ fila.get("PENDENTE", 0) }} na fila · {{ fila.get("FALHOU", 0) }} com falha.</p>
+  {% else %}
+    <p>Ainda não configurado. Preencha os dados do WPPConnect abaixo.</p>
+  {% endif %}
+
+  <details class="passo-a-passo" {% if not cfg %}open{% endif %}>
+    <summary>{{ "Dados do WPPConnect" if cfg else "Configurar o WPPConnect (uma vez só)" }}</summary>
+    <form method="post" action="/config/whatsapp" novalidate autocomplete="off">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label for="url">Endereço do WPPConnect <span class="dica">Na VPS, com os dois na mesma rede: http://wppconnect:21465 (ou o endereço que você usa no n8n)</span></label>
+      <input id="url" name="url" type="text" value="{{ cfg.url if cfg else 'http://wppconnect:21465' }}">
+      <label for="sessao">Nome da sessão <span class="dica">Um nome só desta loja, ex.: loja</span></label>
+      <input id="sessao" name="sessao" type="text" value="{{ cfg.sessao if cfg else 'loja' }}">
+      <label for="segredo">Chave secreta (SECRET_KEY do WPPConnect) <span class="dica">{{ "Deixe em branco para manter a atual" if cfg else "Está no arquivo de configuração do WPPConnect" }}</span></label>
+      <input id="segredo" name="segredo" type="password" autocomplete="off">
+      <label for="numero">Número do WhatsApp da loja <span class="dica">Com DDD, ex.: (19) 3333-0000</span></label>
+      <input id="numero" name="numero" type="tel" value="{{ cfg.numero[2:]|telefone if cfg else '' }}">
+      <label for="endereco_sistema">Endereço deste sistema <span class="dica">Para o WPPConnect avisar as mensagens. Em branco = o endereço do site (SITE_URL)</span></label>
+      <input id="endereco_sistema" name="endereco_sistema" type="text" value="{{ cfg.endereco_sistema or '' if cfg else '' }}">
+      {% if url_webhook %}<p class="suave">Aviso (webhook) configurado em: <code>{{ url_webhook[:url_webhook.rfind('/') + 7] }}…</code></p>{% endif %}
+      <div class="acoes"><button type="submit" class="botao claro">✓ SALVAR DADOS</button></div>
+    </form>
+  </details>
+  <p class="suave">Quem recebe cada aviso se escolhe em <a href="/equipe">Equipe</a> (ficha de cada pessoa). Comandos para mandar no WhatsApp da loja: #caixa, #ontem, #hoje, #pedidos, #site, #ajuda.</p>
+</section>
+
+<section class="cartao" id="email">
+  <h2>E-mail da loja (Gmail)</h2>
+  {% if email %}<p class="sucesso">Enviando pelo {{ email.remetente }}.</p>{% endif %}
+  <details class="passo-a-passo" {% if not email %}open{% endif %}>
+    <summary>Como criar a "senha de app" do Google</summary>
+    <ol>
+      <li>Entre em <strong>myaccount.google.com</strong> com o Gmail da loja.</li>
+      <li>Em <strong>Segurança</strong>, ative a <strong>Verificação em duas etapas</strong> (se ainda não estiver).</li>
+      <li>Procure por <strong>Senhas de app</strong>, crie uma com o nome "Sistema da loja".</li>
+      <li>O Google mostra 16 letras. Cole abaixo (os espaços não importam).</li>
+    </ol>
+  </details>
+  <form method="post" action="/config/email" novalidate autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="remetente">Gmail da loja</label>
+    <input id="remetente" name="remetente" type="email" value="{{ email.remetente if email else '' }}">
+    <label for="senha_app">Senha de app (16 letras)</label>
+    <input id="senha_app" name="senha" type="password" autocomplete="off">
+    <div class="acoes"><button type="submit" class="botao claro">✓ SALVAR E-MAIL</button></div>
+  </form>
+</section>
+
+<section class="cartao" id="horario">
+  <h2>Horário da loja</h2>
+  <p class="suave">Entrada no sistema fora deste horário avisa a Dona e o Dev. O resumo do caixa chega no horário do relatório.</p>
+  <form method="post" action="/config/horario" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="opcoes">
+      {% for n, nome in [(1, "Seg"), (2, "Ter"), (3, "Qua"), (4, "Qui"), (5, "Sex"), (6, "Sáb"), (7, "Dom")] %}
+        <label class="opcao"><input type="checkbox" name="dia_{{ n }}" value="1" {% if n in horario.dias_abertos %}checked{% endif %}>{{ nome }}</label>
+      {% endfor %}
+    </div>
+    <div class="par">
+      <div><label for="abre">Abre às</label><input id="abre" name="abre" type="time" value="{{ horario.abre_as.strftime('%H:%M') }}"></div>
+      <div><label for="fecha">Fecha às</label><input id="fecha" name="fecha" type="time" value="{{ horario.fecha_as.strftime('%H:%M') }}"></div>
+    </div>
+    <label for="relatorio">Resumo do caixa no WhatsApp às</label>
+    <input id="relatorio" name="relatorio" type="time" value="{{ horario.relatorio_as.strftime('%H:%M') }}">
+    <div class="acoes"><button type="submit" class="botao claro">✓ SALVAR HORÁRIO</button></div>
+  </form>
+</section>
+{% endblock %}

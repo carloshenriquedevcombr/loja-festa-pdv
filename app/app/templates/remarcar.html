@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block titulo %}Remarcar {{ COMPROMISSOS[it.tipo]|lower }}{% endblock %}
+{% block voltar %}/pedidos/{{ it.pedido_id }}{% endblock %}
+{% block conteudo %}
+<section class="cartao estreito">
+  {% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+  <p class="frase"><strong>{{ COMPROMISSOS[it.tipo] }}</strong> de <strong>{{ it.cliente or "—" }}</strong><br>
+    <span class="sku">{{ it.sku }}</span> {{ it.peca }}<br>
+    Estava marcada para <strong>{{ it.dia|data }} às {{ it.hora }}</strong>.</p>
+  {% if it.tipo in ("RETIRADA", "DEVOLUCAO") %}<p class="suave">Mudar esta data também muda a reserva da peça. Se a peça já estiver reservada para outra cliente nesses dias, o sistema avisa.</p>{% endif %}
+  <form method="post" action="/agenda/{{ it.id }}/remarcar" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="par">
+      <div><label for="dia">Novo dia</label><input id="dia" name="dia" type="date" value="{{ v.dia or '' }}"></div>
+      <div><label for="hora">Hora</label><input id="hora" name="hora" type="time" value="{{ v.hora or '10:00' }}"></div>
+    </div>
+    <label for="observacao">Motivo ou recado <span class="dica">Opcional. Ex.: cliente pediu para vir à tarde</span></label>
+    <input id="observacao" name="observacao" type="text" maxlength="200" value="{{ v.observacao or '' }}">
+    <div class="acoes"><button type="submit" class="botao">✓ REMARCAR</button></div>
+  </form>
+</section>
+{% endblock %}

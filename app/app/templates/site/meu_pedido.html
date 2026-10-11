@@ -1,0 +1,21 @@
+{% extends "site/base.html" %}
+{% block titulo %}Seu pedido · {{ loja.nome }}{% endblock %}
+{% block cabeca %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block conteudo %}
+<div class="pagina-estreita">
+  <p class="sobretitulo centro">Seu pedido</p>
+  <h1 class="titulo-pagina">{{ doc.titulo }} nº {{ doc.numero }}</h1>
+  {% for b in doc.blocos if b.t == "pares" %}
+    <dl class="ficha">{% for rotulo, valor, forte in b.itens %}<div><dt>{{ rotulo }}</dt><dd>{{ valor }}</dd></div>{% endfor %}</dl>
+  {% endfor %}
+  {% if assinado %}
+    <h2 class="titulo-bloco">Contrato</h2>
+    <div class="contrato-site">{{ texto }}</div>
+    <figure class="assinatura-site"><img src="data:image/png;base64,{{ png }}" alt="Sua assinatura">
+      <figcaption>Assinado em {{ assinado.quando }} · código {{ assinado.codigo }}</figcaption></figure>
+  {% else %}
+    <p class="centro suave">O contrato é assinado na loja, na primeira prova ou na retirada.</p>
+  {% endif %}
+  <p class="centro"><a class="botao-site" href="/site/meu-pedido/{{ token }}/pdf">Baixar em PDF</a></p>
+</div>
+{% endblock %}
